@@ -29,6 +29,9 @@ import type {
   NcertClass,
   Subject,
   LabSpec,
+  Prediction,
+  Misconception,
+  ChoicePoint,
 } from "@/schema/lab-spec";
 
 /* ------------------------------------------------------------------ */
@@ -41,6 +44,7 @@ export interface WizardState {
   variables: Variable[];
   rules: Rule[];
   decision_tables: DecisionTable[];
+  validity_bounds: string[];
   provocation: Provocation;
   ncl: Ncl;
   investigation: Investigation;
@@ -49,6 +53,9 @@ export interface WizardState {
   reflection: Reflection;
   assessment: Assessment;
   ai_tutor_config: AiTutorConfig;
+  prediction?: Prediction;
+  misconceptions: Misconception[];
+  choice_points: ChoicePoint[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -90,6 +97,7 @@ export function emptyWizardState(): WizardState {
     variables: [],
     rules: [],
     decision_tables: [],
+    validity_bounds: [],
     provocation: {
       real_life_scenario: "",
       curiosity_hook: "",
@@ -144,12 +152,14 @@ export function emptyWizardState(): WizardState {
       ] as ForbiddenAction[],
       fallback_when_asked_science: "",
     },
+    misconceptions: [],
+    choice_points: [],
   };
 }
 
 /** Convert WizardState to the LabSpec shape the save action expects. */
 export function wizardStateToLabSpec(state: WizardState): LabSpec {
-  return {
+  const spec: LabSpec = {
     meta: state.meta,
     curriculum_alignment: state.curriculum_alignment,
     science_model: {
@@ -159,6 +169,9 @@ export function wizardStateToLabSpec(state: WizardState): LabSpec {
         state.decision_tables.length > 0
           ? state.decision_tables
           : [],
+      ...(state.validity_bounds.length > 0
+        ? { validity_bounds: state.validity_bounds }
+        : {}),
     },
     provocation: state.provocation,
     ncl: state.ncl,
@@ -169,4 +182,8 @@ export function wizardStateToLabSpec(state: WizardState): LabSpec {
     assessment: state.assessment,
     ai_tutor_config: state.ai_tutor_config,
   };
+  if (state.prediction) spec.prediction = state.prediction;
+  if (state.misconceptions.length > 0) spec.misconceptions = state.misconceptions;
+  if (state.choice_points.length > 0) spec.choice_points = state.choice_points;
+  return spec;
 }

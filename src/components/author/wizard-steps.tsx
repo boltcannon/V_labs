@@ -13,6 +13,14 @@ import type {
   KeyTerm,
   RubricCriterion,
   Experiment,
+  Prediction,
+  PredictionItem,
+  PredictionOption,
+  PredictionInputMode,
+  Misconception,
+  MisconceptionRevision,
+  ChoicePoint,
+  ChoicePointOption,
 } from "@/schema/lab-spec";
 import type { WizardState } from "./wizard-types";
 import {
@@ -830,6 +838,16 @@ export function StepScience({
             </div>
           </Section>
         )}
+
+        {state.validity_bounds.length > 0 && (
+          <Section title="Validity Bounds" description="Where this model stops being accurate" defaultOpen={false}>
+            <ul className="list-disc list-inside space-y-1">
+              {state.validity_bounds.map((b, i) => (
+                <li key={i} className="text-sm text-text-muted">{b}</li>
+              ))}
+            </ul>
+          </Section>
+        )}
       </div>
     );
   }
@@ -993,6 +1011,21 @@ export function StepScience({
             + Add decision table
           </button>
         )}
+      </Section>
+
+      {/* Validity Bounds */}
+      <Section
+        title="Validity Bounds"
+        description="Where the model is an approximation (optional)"
+        defaultOpen={state.validity_bounds.length > 0}
+      >
+        <StringListEditor
+          label="Bounds"
+          hint="optional"
+          items={state.validity_bounds}
+          onChange={(v) => onChange({ ...state, validity_bounds: v })}
+          placeholder='e.g. "Ideal wires and battery (no internal resistance)"'
+        />
       </Section>
     </div>
   );
@@ -1170,8 +1203,28 @@ export function StepPhases({
   const setR = (patch: Partial<typeof r>) =>
     onChange({ ...state, reflection: { ...r, ...patch } });
 
+  const pred = state.prediction;
+  const misconceptions = state.misconceptions;
+  const choicePoints = state.choice_points;
+
+  const setPred = (p: Prediction | undefined) => {
+    const next = { ...state };
+    if (p) {
+      next.prediction = p;
+    } else {
+      delete next.prediction;
+    }
+    onChange(next);
+  };
+  const setMisconceptions = (m: Misconception[]) =>
+    onChange({ ...state, misconceptions: m });
+  const setChoicePoints = (cp: ChoicePoint[]) =>
+    onChange({ ...state, choice_points: cp });
+
   const varIds = state.variables.map((v) => v.id);
   const ruleIds = state.rules.map((ru) => ru.id);
+  const experimentIds = inv.experiments.map((e) => e.id).filter(Boolean);
+  const misconceptionIds = misconceptions.map((m) => m.id).filter(Boolean);
 
   const updateKeyTerm = (i: number, patch: Partial<KeyTerm>) =>
     setN({
@@ -1466,6 +1519,616 @@ export function StepPhases({
           value={r.scaffolding_level}
           onChange={(v) => setR({ scaffolding_level: v })}
         />
+      </Section>
+
+      {/* ── Schema v2: Prediction Gate ─────────────────────────── */}
+      <Section
+        title="7. Prediction Gate"
+        description="Students commit a prediction before running the experiment (optional, schema v2)"
+        defaultOpen={!!pred}
+      >
+        {!pred ? (
+          <button
+            type="button"
+            onClick={() =>
+              setPred({
+                gate: true,
+                input_mode: "choice",
+                items: [],
+              })
+            }
+            className="w-full py-2 text-sm rounded-md border border-dashed border-surface-border text-text-muted hover:border-accent hover:text-accent transition"
+          >
+            + Enable prediction gate
+          </button>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={pred.gate}
+                    onChange={(e) =>
+                      setPred({ ...pred, gate: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  Gate enabled
+                </label>
+                <div className="space-y-1">
+                  <SelectInput
+                    value={pred.input_mode}
+                    onChange={(v) =>
+                      setPred({ ...pred, input_mode: v as PredictionInputMode })
+                    }
+                    options={[
+                      { value: "choice", label: "Multiple choice" },
+                      { value: "sort", label: "Sort / rank" },
+                      { value: "numeric", label: "Numeric" },
+                    ]}
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPred(undefined)}
+                className="text-red-500 hover:text-red-700 text-xs transition"
+              >
+                Remove prediction
+              </button>
+            </div>
+
+            {pred.items.map((item, i) => (
+              <div
+                key={i}
+                className="rounded-lg border border-surface-border p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <FieldLabel>Prediction Item {i + 1}</FieldLabel>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPred({
+                        ...pred,
+                        items: pred.items.filter((_, idx) => idx !== i),
+                      })
+                    }
+                    className="text-red-500 hover:text-red-700 text-xs transition"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <FieldLabel hint="snake_case">ID</FieldLabel>
+                    <TextInput
+                      value={item.id}
+                      onChange={(v) => {
+                        const items = [...pred.items];
+                        items[i] = { ...item, id: v };
+                        setPred({ ...pred, items });
+                      }}
+                      placeholder="pred_current_after_bulb1"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <FieldLabel>Experiment Ref</FieldLabel>
+                    <SelectInput
+                      value={item.experiment_ref}
+                      onChange={(v) => {
+                        const items = [...pred.items];
+                        items[i] = { ...item, experiment_ref: v };
+                        setPred({ ...pred, items });
+                      }}
+                      options={[
+                        { value: "", label: "Select experiment..." },
+                        ...experimentIds.map((id) => ({
+                          value: id,
+                          label: id,
+                        })),
+                      ]}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel>Question</FieldLabel>
+                  <TextArea
+                    value={item.question}
+                    onChange={(v) => {
+                      const items = [...pred.items];
+                      items[i] = { ...item, question: v };
+                      setPred({ ...pred, items });
+                    }}
+                    placeholder="What do you predict will happen to the ammeter reading after the first bulb?"
+                    rows={2}
+                  />
+                </div>
+
+                {/* Options */}
+                <div className="space-y-2 ml-4 border-l-2 border-surface-border pl-4">
+                  <FieldLabel>Answer Options</FieldLabel>
+                  {item.options.map((opt, j) => (
+                    <div
+                      key={j}
+                      className="rounded border border-surface-border p-3 space-y-2 bg-surface-muted/20"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-text-muted font-mono">
+                          {opt.id || `option_${j + 1}`}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const items = [...pred.items];
+                            items[i] = {
+                              ...item,
+                              options: item.options.filter(
+                                (_, oi) => oi !== j,
+                              ),
+                            };
+                            setPred({ ...pred, items });
+                          }}
+                          className="text-red-500 hover:text-red-700 text-xs transition"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <TextInput
+                          value={opt.id}
+                          onChange={(v) => {
+                            const items = [...pred.items];
+                            const opts = [...item.options];
+                            opts[j] = { ...opt, id: v };
+                            items[i] = { ...item, options: opts };
+                            setPred({ ...pred, items });
+                          }}
+                          placeholder="opt_less"
+                        />
+                        <TextInput
+                          value={opt.label}
+                          onChange={(v) => {
+                            const items = [...pred.items];
+                            const opts = [...item.options];
+                            opts[j] = { ...opt, label: v };
+                            items[i] = { ...item, options: opts };
+                            setPred({ ...pred, items });
+                          }}
+                          placeholder="Less than before the bulb"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <FieldLabel hint="engine expression, e.g. i_after == i_before">
+                          correct_when
+                        </FieldLabel>
+                        <TextInput
+                          value={opt.correct_when}
+                          onChange={(v) => {
+                            const items = [...pred.items];
+                            const opts = [...item.options];
+                            opts[j] = { ...opt, correct_when: v };
+                            items[i] = { ...item, options: opts };
+                            setPred({ ...pred, items });
+                          }}
+                          placeholder="i_after_bulb1 == i_before_bulb1"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <FieldLabel hint="optional">
+                          Maps to misconception
+                        </FieldLabel>
+                        <SelectInput
+                          value={opt.maps_to_misconception ?? ""}
+                          onChange={(v) => {
+                            const items = [...pred.items];
+                            const opts = [...item.options];
+                            opts[j] = {
+                              ...opt,
+                              maps_to_misconception: v || null,
+                            };
+                            items[i] = { ...item, options: opts };
+                            setPred({ ...pred, items });
+                          }}
+                          options={[
+                            { value: "", label: "None" },
+                            ...misconceptionIds.map((id) => ({
+                              value: id,
+                              label: id,
+                            })),
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const items = [...pred.items];
+                      items[i] = {
+                        ...item,
+                        options: [
+                          ...item.options,
+                          {
+                            id: "",
+                            label: "",
+                            correct_when: "",
+                          },
+                        ],
+                      };
+                      setPred({ ...pred, items });
+                    }}
+                    className="text-sm text-accent hover:text-accent-strong transition"
+                  >
+                    + Add option
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={() =>
+                setPred({
+                  ...pred,
+                  items: [
+                    ...pred.items,
+                    { id: "", experiment_ref: "", question: "", options: [] },
+                  ],
+                })
+              }
+              className="w-full py-2 text-sm rounded-md border border-dashed border-surface-border text-text-muted hover:border-accent hover:text-accent transition"
+            >
+              + Add prediction item
+            </button>
+          </div>
+        )}
+      </Section>
+
+      {/* ── Schema v2: Misconceptions ──────────────────────────── */}
+      <Section
+        title="8. Misconceptions"
+        description="Common misconceptions with revision sequences (optional, schema v2)"
+        defaultOpen={misconceptions.length > 0}
+      >
+        {misconceptions.map((m, i) => (
+          <div
+            key={i}
+            className="rounded-lg border border-surface-border p-4 space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-sm text-accent">
+                {m.id || "new_misconception"}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setMisconceptions(misconceptions.filter((_, idx) => idx !== i))
+                }
+                className="text-red-500 hover:text-red-700 text-xs transition"
+              >
+                Remove
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <FieldLabel hint="snake_case">ID</FieldLabel>
+                <TextInput
+                  value={m.id}
+                  onChange={(v) => {
+                    const ms = [...misconceptions];
+                    ms[i] = { ...m, id: v };
+                    setMisconceptions(ms);
+                  }}
+                  placeholder="m_current_used_up"
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel hint="research citation">Source</FieldLabel>
+                <TextInput
+                  value={m.source}
+                  onChange={(v) => {
+                    const ms = [...misconceptions];
+                    ms[i] = { ...m, source: v };
+                    setMisconceptions(ms);
+                  }}
+                  placeholder="McDermott & Shaffer (1992)"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <FieldLabel>Misconception Statement</FieldLabel>
+              <TextArea
+                value={m.statement}
+                onChange={(v) => {
+                  const ms = [...misconceptions];
+                  ms[i] = { ...m, statement: v };
+                  setMisconceptions(ms);
+                }}
+                placeholder="Current is used up as it passes through a bulb."
+                rows={2}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <FieldLabel>Detected When (prediction option)</FieldLabel>
+                <TextInput
+                  value={m.detected_when.prediction_option}
+                  onChange={(v) => {
+                    const ms = [...misconceptions];
+                    ms[i] = {
+                      ...m,
+                      detected_when: { prediction_option: v },
+                    };
+                    setMisconceptions(ms);
+                  }}
+                  placeholder="opt_less"
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel>Discrepant Event (experiment ref)</FieldLabel>
+                <SelectInput
+                  value={m.discrepant_event.experiment_ref}
+                  onChange={(v) => {
+                    const ms = [...misconceptions];
+                    ms[i] = {
+                      ...m,
+                      discrepant_event: { experiment_ref: v },
+                    };
+                    setMisconceptions(ms);
+                  }}
+                  options={[
+                    { value: "", label: "Select experiment..." },
+                    ...experimentIds.map((id) => ({
+                      value: id,
+                      label: id,
+                    })),
+                  ]}
+                />
+              </div>
+            </div>
+
+            {/* Revision sequence */}
+            <div className="ml-4 border-l-2 border-amber-200 pl-4 space-y-3">
+              <p className="text-xs font-semibold text-amber-700">
+                Four-part revision sequence (all required)
+              </p>
+              <div className="space-y-1">
+                <FieldLabel>Explain Prompt</FieldLabel>
+                <TextArea
+                  value={m.revision.explain_prompt}
+                  onChange={(v) => {
+                    const ms = [...misconceptions];
+                    ms[i] = { ...m, revision: { ...m.revision, explain_prompt: v } };
+                    setMisconceptions(ms);
+                  }}
+                  placeholder="You predicted that the current would be less. Explain your reasoning."
+                  rows={2}
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel>Compare Prompt</FieldLabel>
+                <TextArea
+                  value={m.revision.compare_prompt}
+                  onChange={(v) => {
+                    const ms = [...misconceptions];
+                    ms[i] = { ...m, revision: { ...m.revision, compare_prompt: v } };
+                    setMisconceptions(ms);
+                  }}
+                  placeholder="Now look at what the ammeter actually shows. How does it compare with your prediction?"
+                  rows={2}
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel>Revise Prompt</FieldLabel>
+                <TextArea
+                  value={m.revision.revise_prompt}
+                  onChange={(v) => {
+                    const ms = [...misconceptions];
+                    ms[i] = { ...m, revision: { ...m.revision, revise_prompt: v } };
+                    setMisconceptions(ms);
+                  }}
+                  placeholder="Based on what you observed, would you change your prediction?"
+                  rows={2}
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel hint="shown only after student attempts revision">
+                  Alternative Model
+                </FieldLabel>
+                <TextArea
+                  value={m.revision.alternative_model}
+                  onChange={(v) => {
+                    const ms = [...misconceptions];
+                    ms[i] = { ...m, revision: { ...m.revision, alternative_model: v } };
+                    setMisconceptions(ms);
+                  }}
+                  placeholder="In a series circuit, current is the same at every point..."
+                  rows={2}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() =>
+            setMisconceptions([
+              ...misconceptions,
+              {
+                id: "",
+                statement: "",
+                source: "",
+                detected_when: { prediction_option: "" },
+                discrepant_event: { experiment_ref: "" },
+                revision: {
+                  explain_prompt: "",
+                  compare_prompt: "",
+                  revise_prompt: "",
+                  alternative_model: "",
+                },
+              },
+            ])
+          }
+          className="w-full py-2 text-sm rounded-md border border-dashed border-surface-border text-text-muted hover:border-accent hover:text-accent transition"
+        >
+          + Add misconception
+        </button>
+      </Section>
+
+      {/* ── Schema v2: Choice Points ───────────────────────────── */}
+      <Section
+        title="9. Choice Points"
+        description="Bounded learner agency: what to test next (optional, schema v2)"
+        defaultOpen={choicePoints.length > 0}
+      >
+        {choicePoints.map((cp, i) => (
+          <div
+            key={i}
+            className="rounded-lg border border-surface-border p-4 space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-sm text-accent">
+                {cp.id || "new_choice_point"}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setChoicePoints(choicePoints.filter((_, idx) => idx !== i))
+                }
+                className="text-red-500 hover:text-red-700 text-xs transition"
+              >
+                Remove
+              </button>
+            </div>
+            <div className="space-y-1">
+              <FieldLabel hint="snake_case">ID</FieldLabel>
+              <TextInput
+                value={cp.id}
+                onChange={(v) => {
+                  const cps = [...choicePoints];
+                  cps[i] = { ...cp, id: v };
+                  setChoicePoints(cps);
+                }}
+                placeholder="cp_which_to_test"
+              />
+            </div>
+            <div className="space-y-1">
+              <FieldLabel>Prompt</FieldLabel>
+              <TextArea
+                value={cp.prompt}
+                onChange={(v) => {
+                  const cps = [...choicePoints];
+                  cps[i] = { ...cp, prompt: v };
+                  setChoicePoints(cps);
+                }}
+                placeholder="What do you want to test first?"
+                rows={2}
+              />
+            </div>
+
+            {/* Choice options */}
+            <div className="space-y-2 ml-4 border-l-2 border-surface-border pl-4">
+              <FieldLabel>Options</FieldLabel>
+              {cp.options.map((opt, j) => (
+                <div
+                  key={j}
+                  className="rounded border border-surface-border p-3 space-y-2 bg-surface-muted/20"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-text-muted font-mono">
+                      {opt.id || `cp_opt_${j + 1}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cps = [...choicePoints];
+                        cps[i] = {
+                          ...cp,
+                          options: cp.options.filter((_, oi) => oi !== j),
+                        };
+                        setChoicePoints(cps);
+                      }}
+                      className="text-red-500 hover:text-red-700 text-xs transition"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <TextInput
+                      value={opt.id}
+                      onChange={(v) => {
+                        const cps = [...choicePoints];
+                        const opts = [...cp.options];
+                        opts[j] = { ...opt, id: v };
+                        cps[i] = { ...cp, options: opts };
+                        setChoicePoints(cps);
+                      }}
+                      placeholder="cp_current"
+                    />
+                    <TextInput
+                      value={opt.label}
+                      onChange={(v) => {
+                        const cps = [...choicePoints];
+                        const opts = [...cp.options];
+                        opts[j] = { ...opt, label: v };
+                        cps[i] = { ...cp, options: opts };
+                        setChoicePoints(cps);
+                      }}
+                      placeholder="Current before/after a bulb"
+                    />
+                    <SelectInput
+                      value={opt.routes_to_misconception}
+                      onChange={(v) => {
+                        const cps = [...choicePoints];
+                        const opts = [...cp.options];
+                        opts[j] = { ...opt, routes_to_misconception: v };
+                        cps[i] = { ...cp, options: opts };
+                        setChoicePoints(cps);
+                      }}
+                      options={[
+                        { value: "", label: "Select misconception..." },
+                        ...misconceptionIds.map((id) => ({
+                          value: id,
+                          label: id,
+                        })),
+                      ]}
+                    />
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const cps = [...choicePoints];
+                  cps[i] = {
+                    ...cp,
+                    options: [
+                      ...cp.options,
+                      { id: "", label: "", routes_to_misconception: "" },
+                    ],
+                  };
+                  setChoicePoints(cps);
+                }}
+                className="text-sm text-accent hover:text-accent-strong transition"
+              >
+                + Add option
+              </button>
+            </div>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() =>
+            setChoicePoints([
+              ...choicePoints,
+              { id: "", prompt: "", options: [] },
+            ])
+          }
+          className="w-full py-2 text-sm rounded-md border border-dashed border-surface-border text-text-muted hover:border-accent hover:text-accent transition"
+        >
+          + Add choice point
+        </button>
       </Section>
     </div>
   );

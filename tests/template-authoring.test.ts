@@ -29,12 +29,13 @@ import type { ValidatedLabSpec } from "../src/schema/lab-spec";
 /* ------------------------------------------------------------------ */
 
 function specToWizardState(spec: ValidatedLabSpec): WizardState {
-  return {
+  const ws: WizardState = {
     meta: { ...spec.meta, topic: "", authors: [""] },
     curriculum_alignment: spec.curriculum_alignment,
     variables: spec.science_model.variables,
     rules: spec.science_model.rules,
     decision_tables: spec.science_model.decision_tables ?? [],
+    validity_bounds: spec.science_model.validity_bounds ?? [],
     provocation: spec.provocation,
     ncl: spec.ncl,
     investigation: spec.investigation,
@@ -43,7 +44,11 @@ function specToWizardState(spec: ValidatedLabSpec): WizardState {
     reflection: spec.reflection,
     assessment: spec.assessment,
     ai_tutor_config: spec.ai_tutor_config,
+    misconceptions: spec.misconceptions ?? [],
+    choice_points: spec.choice_points ?? [],
   };
+  if (spec.prediction) ws.prediction = spec.prediction;
+  return ws;
 }
 
 /* ------------------------------------------------------------------ */
