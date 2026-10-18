@@ -138,3 +138,55 @@ export function v2Spec() {
 }
 
 export type V2SpecFixture = ReturnType<typeof v2Spec>;
+
+/**
+ * THESIS EVIDENCE FIXTURE — a discrepant event that configuration breaks.
+ *
+ * Same circuit, but the M1 prediction is asked about BRIGHTNESS instead
+ * of current: "bulb 2 will be dimmer than bulb 1" (current used up). At
+ * the preset r1 = r2 = 10 the bulbs are equally bright, so the mapped
+ * option is false and the event looks discrepant (passes V2 and V3).
+ * But r1 and r2 are unlocked, and wherever r2 < r1 bulb 2 really IS
+ * dimmer — the misconception's prediction comes true. V4 must catch this
+ * and name such a point. (CLAUDE.md §9: use current, not brightness.)
+ */
+export function brightnessSpec() {
+  const spec = v2Spec();
+  spec.science_model.variables.push(
+    { id: "p1", label: "Bulb 1 power", type: "number", unit: "W", range: [0, 100], role: "output" },
+    { id: "p2", label: "Bulb 2 power", type: "number", unit: "W", range: [0, 100], role: "output" },
+  );
+  spec.science_model.rules.push(
+    { id: "power_bulb1", description: "d", expression: "p1 = i_series^2 * r1", validated_by: "fixture" },
+    { id: "power_bulb2", description: "d", expression: "p2 = i_series^2 * r2", validated_by: "fixture" },
+  );
+  spec.investigation.experiments[0]!.measured_vars.push("p1", "p2");
+  spec.prediction.items = [
+    {
+      id: "pred_bulb2_brightness",
+      experiment_ref: "exp_series_current",
+      question: "Compared with bulb 1, how bright will bulb 2 be?",
+      options: [
+        {
+          id: "opt_b2_dimmer",
+          label: "Dimmer — some current was used up by bulb 1",
+          correct_when: "p2 < p1",
+          maps_to_misconception: "m_current_used_up",
+        },
+        {
+          id: "opt_b2_same",
+          label: "Equally bright",
+          correct_when: "p2 == p1",
+          maps_to_misconception: null,
+        },
+        {
+          id: "opt_b2_brighter",
+          label: "Brighter",
+          correct_when: "p2 > p1",
+        },
+      ],
+    },
+  ];
+  spec.misconceptions[0]!.detected_when = { prediction_option: "opt_b2_dimmer" };
+  return spec;
+}

@@ -87,6 +87,56 @@ export function parseRuleExpression(expr: string): ParsedExpression {
   };
 }
 
+/**
+ * A bare true/false condition over variable ids, e.g.
+ * "i_after_bulb1 < i_before_bulb1". Used for schema v2
+ * `prediction.items[].options[].correct_when`. Same parser, same operator
+ * whitelist as rule expressions — but no `target =` on the left.
+ */
+export interface ParsedCondition {
+  source: string;
+  ast: Expression;
+  /** Free variables (function names excluded). */
+  variables: string[];
+}
+
+/** @throws Error if the condition does not parse. */
+export function parseCondition(expr: string): ParsedCondition {
+  let ast: Expression;
+  try {
+    ast = parser.parse(expr);
+  } catch (err) {
+    throw new Error(
+      `Condition '${expr}' does not parse: ${(err as Error).message}`,
+    );
+  }
+  return { source: expr, ast, variables: ast.variables() };
+}
+
+export type ConditionResult =
+  | { ok: true; value: boolean }
+  | { ok: false; reason: "not_boolean"; raw: unknown }
+  | { ok: false; reason: "evaluation_error"; message: string };
+
+/**
+ * Evaluate a parsed condition against a scope. Never throws: a non-boolean
+ * result or an evaluation error is returned as `{ok: false}` so a caller
+ * (the spec validator) can report it against the offending option.
+ */
+export function evaluateCondition(
+  parsed: ParsedCondition,
+  scope: Record<string, Scalar>,
+): ConditionResult {
+  let raw: unknown;
+  try {
+    raw = parsed.ast.evaluate(scope as unknown as Record<string, number>);
+  } catch (err) {
+    return { ok: false, reason: "evaluation_error", message: (err as Error).message };
+  }
+  if (typeof raw !== "boolean") return { ok: false, reason: "not_boolean", raw };
+  return { ok: true, value: raw };
+}
+
 /** Result of an expression evaluation. */
 export type EvalResult =
   | { ok: true; value: Scalar }
