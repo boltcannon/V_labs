@@ -29,9 +29,9 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Play, Beaker, Compass, Settings2, ChevronDown, ChevronRight, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Play, Beaker, Compass, Settings2, ChevronDown, ChevronRight, ArrowRight, CheckCircle2, Lock } from "lucide-react";
 
-import type { Investigation, Variable } from "@/schema/lab-spec";
+import type { Investigation, PublicPrediction, Variable } from "@/schema/lab-spec";
 import type { Scalar } from "@/engine/types";
 import {
   FREE_EXPLORATION_ID,
@@ -41,6 +41,15 @@ import {
   type RunOutput,
 } from "@/app/lib/experiment-run";
 import { runExperiment } from "@/app/actions/run-experiment";
+import { resolvePrediction, revealAlternativeModel } from "@/app/actions/prediction";
+import {
+  initialPredictionState,
+  isRunUnlocked,
+  predictionReducer,
+  type PredictionAction,
+  type PredictionState,
+  type RevisionStep,
+} from "@/app/lib/prediction-flow";
 import {
   useLabSession,
 } from "@/app/lib/session-state";
@@ -51,11 +60,14 @@ import { cn } from "@/lib/cn";
 import { VariableControl, VariableReadonly, defaultValue } from "./variable-control";
 import { ResultsPanel } from "./results-panel";
 import { RunHistoryTable } from "./run-history-table";
+import { PredictionPanel } from "./prediction-panel";
 
 interface Props {
   labId: string;
   investigation: Investigation;
   variables: Variable[];
+  /** Schema v2, redacted (no answer key). Absent for v1 labs. */
+  prediction?: PublicPrediction | undefined;
 }
 
 interface TabSpec {
@@ -67,7 +79,7 @@ interface TabSpec {
   measured: string[];
 }
 
-export function InvestigationShell({ labId, investigation, variables }: Props) {
+export function InvestigationShell({ labId, investigation, variables, prediction }: Props) {
   const varsById = useMemo(
     () => new Map(variables.map((v) => [v.id, v])),
     [variables],
@@ -97,12 +109,41 @@ export function InvestigationShell({ labId, investigation, variables }: Props) {
   const [activeTab, setActiveTab] = useState<string>(tabs[0]!.id);
   const [constantsOpen, setConstantsOpen] = useState<boolean>(false);
 
-  // Sticky variable values across tabs.
+  /* ---- Prediction gate (schema v2) ---- */
+  // Only a gated prediction locks runs. Items are matched to tabs by
+  // experiment id; the answer key never reaches this component.
+  const gate = prediction?.gate === true;
+  const itemForTab = useCallback(
+    (tabId: string) =>
+      gate ? prediction!.items.find((i) => i.experiment_ref === tabId) : undefined,
+    [gate, prediction],
+  );
+  const presetFor = useCallback(
+    (tabId: string) => investigation.experiments.find((e) => e.id === tabId)?.preset,
+    [investigation],
+  );
+  const [predictions, setPredictions] = useState<Record<string, PredictionState>>({});
+  const [predError, setPredError] = useState<string | null>(null);
+  const [predPending, startPredTransition] = useTransition();
+
+  const dispatchPrediction = useCallback((itemId: string, action: PredictionAction) => {
+    setPredictions((prev) => ({
+      ...prev,
+      [itemId]: predictionReducer(prev[itemId] ?? initialPredictionState(), action),
+    }));
+  }, []);
+
+  // Sticky variable values across tabs. A gated first tab starts at its
+  // preset, so the controls show the configuration being predicted about.
   const [varValues, setVarValues] = useState<Record<string, Scalar>>(() => {
     const seed: Record<string, Scalar> = {};
     for (const id of investigation.explorable_variables) {
       const v = varsById.get(id);
       if (v) seed[id] = defaultValue(v);
+    }
+    const first = tabs[0]!.id;
+    if (gate && prediction!.items.some((i) => i.experiment_ref === first)) {
+      Object.assign(seed, investigation.experiments.find((e) => e.id === first)?.preset ?? {});
     }
     return seed;
   });
@@ -190,7 +231,76 @@ export function InvestigationShell({ labId, investigation, variables }: Props) {
   );
 
   const experimentsForFilter = tabs.map((t) => ({ id: t.id, label: t.label }));
-  const canFinish = runs.length >= 1;
+
+  /* ---- Gate status for the current tab ---- */
+  const currentItem = itemForTab(currentTab.id);
+  const currentPrediction = currentItem
+    ? predictions[currentItem.id] ?? initialPredictionState()
+    : undefined;
+  const allPredictionsDone =
+    !gate || prediction!.items.every((i) => isRunUnlocked(predictions[i.id]));
+  // Free exploration would show every output, so it opens only once every
+  // gated prediction has been committed and revised.
+  const freeLocked = currentTab.id === FREE_EXPLORATION_ID && !allPredictionsDone;
+  const tabLocked = currentItem !== undefined && !isRunUnlocked(currentPrediction);
+  const runLocked = tabLocked || freeLocked;
+
+  const commitPrediction = useCallback(() => {
+    if (!currentItem || currentPrediction?.stage !== "choosing") return;
+    const optionId = currentPrediction.selected;
+    if (!optionId) return;
+    const itemId = currentItem.id;
+    setPredError(null);
+    startPredTransition(async () => {
+      const r = await resolvePrediction({ lab_id: labId, item_id: itemId, option_id: optionId });
+      if (!r.ok) {
+        setPredError(r.error);
+        return;
+      }
+      dispatchPrediction(itemId, { type: "resolved", resolution: r.resolution });
+      // The resolving run is a real engine run: record it in the history
+      // and move the controls to the preset it ran at.
+      setRuns((prev) => [
+        ...prev,
+        {
+          id: makeRunId(),
+          timestamp: Date.now(),
+          experiment_id: r.resolution.experiment_id,
+          inputs: r.resolution.inputs,
+          outputs: r.resolution.outputs,
+        },
+      ]);
+      setVarValues((prev) => ({ ...prev, ...r.resolution.inputs }));
+      setLastError(null);
+    });
+  }, [currentItem, currentPrediction, labId, dispatchPrediction]);
+
+  const answerRevision = useCallback(
+    (step: RevisionStep, text: string) => {
+      if (!currentItem || currentPrediction?.stage !== "resolved") return;
+      const itemId = currentItem.id;
+      const { resolution } = currentPrediction;
+      dispatchPrediction(itemId, { type: "answer", step, text });
+      if (step !== "revise" || !resolution.revision?.has_teacher_model || text.trim() === "") return;
+      setPredError(null);
+      startPredTransition(async () => {
+        const r = await revealAlternativeModel({
+          lab_id: labId,
+          item_id: itemId,
+          option_id: resolution.chosen_option_id,
+          revise_text: text,
+        });
+        if (!r.ok) {
+          setPredError(r.error);
+          return;
+        }
+        dispatchPrediction(itemId, { type: "alternative_model", text: r.text });
+      });
+    },
+    [currentItem, currentPrediction, labId, dispatchPrediction],
+  );
+
+  const canFinish = runs.length >= 1 && allPredictionsDone;
 
   return (
     <div className="space-y-5">
@@ -213,7 +323,15 @@ export function InvestigationShell({ labId, investigation, variables }: Props) {
               onClick={() => {
                 setActiveTab(t.id);
                 setLastError(null);
+                setPredError(null);
                 setConstantsOpen(false);
+                // A still-locked gated tab shows its preset — the
+                // configuration the prediction is about.
+                const item = itemForTab(t.id);
+                const preset = presetFor(t.id);
+                if (item && preset && !isRunUnlocked(predictions[item.id])) {
+                  setVarValues((prev) => ({ ...prev, ...preset }));
+                }
               }}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium border transition",
@@ -238,6 +356,29 @@ export function InvestigationShell({ labId, investigation, variables }: Props) {
         </div>
       )}
 
+      {/* Prediction gate (schema v2) */}
+      {currentItem && currentPrediction && (
+        <PredictionPanel
+          item={currentItem}
+          state={currentPrediction}
+          variables={variables}
+          measured={currentTab.measured}
+          pending={predPending}
+          error={predError}
+          onSelect={(optionId) =>
+            dispatchPrediction(currentItem.id, { type: "select", option_id: optionId })
+          }
+          onCommit={commitPrediction}
+          onAnswer={answerRevision}
+        />
+      )}
+      {freeLocked && (
+        <div className="flex items-start gap-2 rounded-md border border-surface-border bg-surface-muted px-4 py-3 text-sm text-text-muted">
+          <Lock className="w-4 h-4 mt-0.5 shrink-0" />
+          Free exploration opens once you have made and checked a prediction in each experiment tab.
+        </div>
+      )}
+
       {/* Controls area */}
       <div className="grid gap-4 md:grid-cols-2">
         <div>
@@ -256,7 +397,7 @@ export function InvestigationShell({ labId, investigation, variables }: Props) {
                   variable={v}
                   value={varValues[id]}
                   onChange={(nv) => setValue(id, nv)}
-                  disabled={pending}
+                  disabled={pending || runLocked}
                 />
               );
             })}
@@ -272,10 +413,10 @@ export function InvestigationShell({ labId, investigation, variables }: Props) {
               <button
                 type="button"
                 onClick={() => setConstantsOpen((v) => !v)}
-                disabled={pending}
+                disabled={pending || runLocked}
                 className={cn(
                   "inline-flex items-center gap-1 text-xs text-accent-strong hover:text-accent transition",
-                  pending && "opacity-50 cursor-not-allowed",
+                  (pending || runLocked) && "opacity-50 cursor-not-allowed",
                 )}
                 aria-expanded={constantsOpen}
               >
@@ -303,7 +444,7 @@ export function InvestigationShell({ labId, investigation, variables }: Props) {
                       variable={v}
                       value={varValues[id]}
                       onChange={(nv) => setValue(id, nv)}
-                      disabled={pending}
+                      disabled={pending || runLocked}
                     />
                   );
                 })}
@@ -341,9 +482,9 @@ export function InvestigationShell({ labId, investigation, variables }: Props) {
             </>
           )}
         </div>
-        <Button onClick={runNow} disabled={pending}>
-          <Play className="w-4 h-4" />
-          {pending ? "Running…" : "Run experiment"}
+        <Button onClick={runNow} disabled={pending || runLocked}>
+          {runLocked ? <Lock className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+          {pending ? "Running…" : runLocked ? "Predict first" : "Run experiment"}
         </Button>
       </div>
 
@@ -384,7 +525,9 @@ export function InvestigationShell({ labId, investigation, variables }: Props) {
                 ? "You've submitted your data history for this lab. Re-submitting will overwrite it with the current runs."
                 : canFinish
                   ? `You've recorded ${runs.length} run${runs.length === 1 ? "" : "s"}. When you're done, submit to unlock Analysis.`
-                  : "Run at least one experiment before finishing."}
+                  : !allPredictionsDone
+                    ? "Make and check a prediction in each experiment tab before finishing."
+                    : "Run at least one experiment before finishing."}
             </p>
           </div>
           <Button

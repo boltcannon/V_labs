@@ -1,4 +1,5 @@
 import { getLabSpec } from "@/app/lib/get-lab-spec";
+import { toPublicPrediction } from "@/app/lib/to-public-spec";
 import { PhaseCard } from "@/components/phase-card";
 import { InvestigationShell } from "@/components/investigation/investigation-shell";
 import { TutorPanel } from "@/components/tutor/tutor-panel";
@@ -25,6 +26,7 @@ export default function InvestigationPage({ params }: Props) {
           labId={params.lab_id}
           investigation={spec.investigation}
           variables={spec.science_model.variables}
+          prediction={toPublicPrediction(spec)}
         />
       </PhaseCard>
       <TutorPanel labId={params.lab_id} currentPhase="investigation" />

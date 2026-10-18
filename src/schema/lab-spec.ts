@@ -373,10 +373,12 @@ export function asValidatedLabSpec(spec: LabSpec): ValidatedLabSpec {
  *     sliders, dropdowns, and axis labels. This is the only legitimate
  *     client use of anything under `science_model`.
  *
- *   - Schema v2 `prediction`, `misconceptions` and `choice_points` are
- *     NOT included: `correct_when` is the answer key and
- *     `alternative_model` must stay hidden until a revision attempt. A
- *     redacted client shape is the prediction-UI task's job (T4).
+ *   - Schema v2 `prediction` is included only as `PublicPrediction`:
+ *     questions and option labels, with `correct_when` (the answer key)
+ *     and `maps_to_misconception` removed. `misconceptions` and
+ *     `choice_points` are NOT included: `alternative_model` must stay
+ *     hidden until a revision attempt, and the server hands out the
+ *     revision prompts only after a prediction is resolved.
  *
  *   - The brand is dropped by construction — `PublicLabSpec` is a plain
  *     interface with no `unique symbol` phantom field, so it is fully
@@ -395,4 +397,18 @@ export interface PublicLabSpec {
   reflection: Reflection;
   assessment: Assessment;
   ai_tutor_config: AiTutorConfig;
+  /** Schema v2, redacted. */
+  prediction?: PublicPrediction;
+}
+
+/** Client-safe prediction: no answer key, no misconception mapping. */
+export interface PublicPrediction {
+  gate: boolean;
+  input_mode: PredictionInputMode;
+  items: Array<{
+    id: string;
+    experiment_ref: string;
+    question: string;
+    options: Array<{ id: string; label: string }>;
+  }>;
 }

@@ -320,7 +320,7 @@ describe("schema v2 — answers do not reach the client or the tutor", () => {
     spec.misconceptions![0]!.revision.alternative_model,
   ];
 
-  it("toPublicLabSpec drops prediction, misconceptions and choice_points", () => {
+  it("toPublicLabSpec redacts prediction and drops misconceptions and choice_points", () => {
     const pub = JSON.stringify(toPublicLabSpec(spec));
     for (const s of secrets) expect(pub).not.toContain(s);
     expect(pub).not.toContain("correct_when");
