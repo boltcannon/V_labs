@@ -61,6 +61,9 @@ import { VariableControl, VariableReadonly, defaultValue } from "./variable-cont
 import { ResultsPanel } from "./results-panel";
 import { RunHistoryTable } from "./run-history-table";
 import { PredictionPanel } from "./prediction-panel";
+import { CircuitStage } from "@/components/stage/circuit-stage";
+import { circuitStagePropsFromRun } from "@/components/stage/circuit-stage-adapter";
+import type { StageKind } from "@/components/stage/stage-registry";
 
 interface Props {
   labId: string;
@@ -68,6 +71,12 @@ interface Props {
   variables: Variable[];
   /** Schema v2, redacted (no answer key). Absent for v1 labs. */
   prediction?: PublicPrediction | undefined;
+  /**
+   * Live visual stage for this lab, if any. When set, settling a control
+   * runs the engine (via the runExperiment Server Action) and the stage
+   * redraws from the run's outputs.
+   */
+  stage?: StageKind | undefined;
 }
 
 interface TabSpec {
@@ -79,7 +88,7 @@ interface TabSpec {
   measured: string[];
 }
 
-export function InvestigationShell({ labId, investigation, variables, prediction }: Props) {
+export function InvestigationShell({ labId, investigation, variables, prediction, stage }: Props) {
   const varsById = useMemo(
     () => new Map(variables.map((v) => [v.id, v])),
     [variables],
@@ -172,14 +181,19 @@ export function InvestigationShell({ labId, investigation, variables, prediction
     return null;
   }, [runs, currentTab.id]);
 
-  const runNow = useCallback(() => {
+  /**
+   * `overrides` carries a value that has just settled (slider release) so
+   * the run uses it even if the matching state update hasn't rendered yet.
+   */
+  const runNow = useCallback((overrides: Record<string, Scalar> = {}) => {
     const varsExposed = new Set([
       ...currentTab.controlled,
       ...currentTab.manipulated,
     ]);
+    const values = { ...varValues, ...overrides };
     const inputs: Record<string, Scalar> = {};
     for (const id of varsExposed) {
-      if (id in varValues) inputs[id] = varValues[id]!;
+      if (id in values) inputs[id] = values[id]!;
     }
     startTransition(async () => {
       const out = await runExperiment({
@@ -244,6 +258,12 @@ export function InvestigationShell({ labId, investigation, variables, prediction
   const freeLocked = currentTab.id === FREE_EXPLORATION_ID && !allPredictionsDone;
   const tabLocked = currentItem !== undefined && !isRunUnlocked(currentPrediction);
   const runLocked = tabLocked || freeLocked;
+  // With a live stage, releasing a slider runs the engine — unless the
+  // prediction gate still holds this tab.
+  const autoRun = stage !== undefined && !runLocked;
+  // The stage draws the latest run, but stays idle on a locked tab so it
+  // can't show a reading before the student has predicted it.
+  const stageOutputs = runLocked ? null : runs[runs.length - 1]?.outputs ?? null;
 
   const commitPrediction = useCallback(() => {
     if (!currentItem || currentPrediction?.stage !== "choosing") return;
@@ -379,6 +399,18 @@ export function InvestigationShell({ labId, investigation, variables, prediction
         </div>
       )}
 
+      {/* Live stage — draws engine outputs only */}
+      {stage === "series_circuit" && (
+        <div className="space-y-1.5">
+          <CircuitStage {...circuitStagePropsFromRun(stageOutputs, variables)} />
+          <p className="text-xs text-text-soft">
+            {runLocked
+              ? "The circuit lights up once you have made your prediction."
+              : "Release a slider to run the circuit. Every reading comes from the lab's engine."}
+          </p>
+        </div>
+      )}
+
       {/* Controls area */}
       <div className="grid gap-4 md:grid-cols-2">
         <div>
@@ -397,6 +429,7 @@ export function InvestigationShell({ labId, investigation, variables, prediction
                   variable={v}
                   value={varValues[id]}
                   onChange={(nv) => setValue(id, nv)}
+                  onCommit={autoRun ? (nv) => runNow({ [id]: nv }) : undefined}
                   disabled={pending || runLocked}
                 />
               );
@@ -444,6 +477,7 @@ export function InvestigationShell({ labId, investigation, variables, prediction
                       variable={v}
                       value={varValues[id]}
                       onChange={(nv) => setValue(id, nv)}
+                      onCommit={autoRun ? (nv) => runNow({ [id]: nv }) : undefined}
                       disabled={pending || runLocked}
                     />
                   );
@@ -482,7 +516,7 @@ export function InvestigationShell({ labId, investigation, variables, prediction
             </>
           )}
         </div>
-        <Button onClick={runNow} disabled={pending || runLocked}>
+        <Button onClick={() => runNow()} disabled={pending || runLocked}>
           {runLocked ? <Lock className="w-4 h-4" /> : <Play className="w-4 h-4" />}
           {pending ? "Running…" : runLocked ? "Predict first" : "Run experiment"}
         </Button>
