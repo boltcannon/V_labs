@@ -184,6 +184,7 @@ export const scienceModelSchema = z
     variables: z.array(variableSchema).min(1),
     rules: z.array(ruleSchema).min(1),
     decision_tables: z.array(decisionTableSchema).optional(),
+    validity_bounds: z.array(z.string().min(1)).optional(),
   })
   .superRefine((sm, ctx) => {
     const varIds = new Set(sm.variables.map((v) => v.id));
@@ -317,6 +318,7 @@ export const experimentSchema = z.object({
   manipulated_vars: z.array(idSchema).min(1),
   measured_vars: z.array(idSchema).min(1),
   exercises_rules: z.array(idSchema).optional(),
+  preset: z.record(idSchema, scalarValueSchema).optional(),
 });
 
 export const investigationSchema = z.object({
@@ -382,6 +384,87 @@ export const aiTutorConfigSchema = z.object({
 });
 
 /* ------------------------------------------------------------------ */
+/* Schema v2 — prediction, misconceptions, choice points (all optional) */
+/* Shapes only. Cross-references and engine-evaluated checks (V1–V8)   */
+/* live in the spec validator, not here.                               */
+/* ------------------------------------------------------------------ */
+
+export const predictionOptionSchema = z.object({
+  id: idSchema,
+  label: z.string().min(1),
+  correct_when: z.string().min(1),
+  maps_to_misconception: idSchema.nullable().optional(),
+});
+
+export const predictionItemSchema = z.object({
+  id: idSchema,
+  experiment_ref: idSchema,
+  question: z.string().min(1),
+  options: z.array(predictionOptionSchema).min(2),
+});
+
+export const predictionSchema = z.object({
+  gate: z.boolean(),
+  input_mode: z.enum(["choice", "sort", "numeric"]),
+  items: z.array(predictionItemSchema).min(1),
+});
+
+export const misconceptionSchema = z.object({
+  id: idSchema,
+  statement: z.string().min(1),
+  source: z.string().min(1),
+  detected_when: z.object({ prediction_option: idSchema }),
+  discrepant_event: z.object({ experiment_ref: idSchema }),
+  revision: z.object({
+    explain_prompt: z.string().min(1),
+    compare_prompt: z.string().min(1),
+    revise_prompt: z.string().min(1),
+    alternative_model: z.string().min(1),
+  }),
+});
+
+export const choicePointSchema = z.object({
+  id: idSchema,
+  prompt: z.string().min(1),
+  options: z
+    .array(
+      z.object({
+        id: idSchema,
+        label: z.string().min(1),
+        routes_to_misconception: idSchema,
+      }),
+    )
+    .min(1),
+});
+
+/**
+ * Check one preset value against its variable's declaration. Returns an
+ * error message, or null if the value is acceptable. Mirrors the engine's
+ * input type-check so a preset can always be fed straight to `runLab()`.
+ */
+function presetValueError(
+  v: { type: string; range?: [number, number] | undefined; options?: string[] | undefined },
+  val: string | number | boolean,
+): string | null {
+  if (v.type === "number") {
+    if (typeof val !== "number") return `expected number, got ${typeof val}`;
+    if (v.range && (val < v.range[0] || val > v.range[1])) {
+      return `value ${val} out of range [${v.range[0]}, ${v.range[1]}]`;
+    }
+    return null;
+  }
+  if (v.type === "categorical") {
+    if (typeof val !== "string") return `expected string, got ${typeof val}`;
+    if (v.options && !v.options.includes(val)) {
+      return `value '${val}' not in options ${JSON.stringify(v.options)}`;
+    }
+    return null;
+  }
+  if (typeof val !== "boolean") return `expected boolean, got ${typeof val}`;
+  return null;
+}
+
+/* ------------------------------------------------------------------ */
 /* Top-level                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -398,9 +481,13 @@ export const labSpecSchema = z
     reflection: reflectionSchema,
     assessment: assessmentSchema,
     ai_tutor_config: aiTutorConfigSchema,
+    prediction: predictionSchema.optional(),
+    misconceptions: z.array(misconceptionSchema).min(1).optional(),
+    choice_points: z.array(choicePointSchema).min(1).optional(),
   })
   .superRefine((spec, ctx) => {
     const varIds = new Set(spec.science_model.variables.map((v) => v.id));
+    const varsById = new Map(spec.science_model.variables.map((v) => [v.id, v]));
 
     // every explorable_variable exists
     for (const id of spec.investigation.explorable_variables) {
@@ -441,6 +528,36 @@ export const labSpecSchema = z
               message: `experiment '${exp.id}' references unknown rule '${rid}'.`,
             });
           }
+        }
+      }
+
+      // Schema v2: preset keys are declared input variables, values valid.
+      for (const [id, val] of Object.entries(exp.preset ?? {})) {
+        const path = ["investigation", "experiments", i, "preset", id];
+        const v = varsById.get(id);
+        if (!v) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path,
+            message: `experiment '${exp.id}' preset references unknown variable '${id}'.`,
+          });
+          continue;
+        }
+        if (v.role !== "input") {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path,
+            message: `experiment '${exp.id}' presets '${id}' which has role='${v.role}'. Only input variables may be preset.`,
+          });
+          continue;
+        }
+        const err = presetValueError(v, val);
+        if (err) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path,
+            message: `experiment '${exp.id}' preset '${id}': ${err}.`,
+          });
         }
       }
     }
