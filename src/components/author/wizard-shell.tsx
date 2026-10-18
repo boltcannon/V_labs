@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useTransition, useMemo } from "react";
+import { useState, useCallback, useTransition, useMemo, useEffect } from "react";
 import yaml from "js-yaml";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
@@ -20,6 +20,11 @@ import {
   saveLabSpec,
   type SaveLabSpecResult,
 } from "@/app/actions/save-lab-spec";
+import {
+  getTemplateList,
+  loadTemplate,
+  type LabSummary,
+} from "@/app/actions/load-template";
 
 const REVIEW_STEP_ID = "review";
 
@@ -27,6 +32,127 @@ const ALL_STEPS = [
   ...WIZARD_STEPS,
   { id: REVIEW_STEP_ID, label: "Review & Save", shortLabel: "Review" },
 ];
+
+const SUBJECT_LABELS: Record<string, string> = {
+  physics: "Physics",
+  chemistry: "Chemistry",
+  biology: "Biology",
+  "integrated-science": "Integrated Science",
+};
+
+/* ------------------------------------------------------------------ */
+/*  Template Picker                                                    */
+/* ------------------------------------------------------------------ */
+
+function TemplatePicker({
+  onPickTemplate,
+  onStartBlank,
+}: {
+  onPickTemplate: (labId: string) => void;
+  onStartBlank: () => void;
+}) {
+  const [templates, setTemplates] = useState<LabSummary[] | null>(null);
+  const [loading, setLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    getTemplateList().then(setTemplates);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-surface-muted flex flex-col">
+      <header className="bg-surface border-b border-surface-border px-6 py-3">
+        <div className="max-w-3xl mx-auto flex items-center gap-3">
+          <Link
+            href="/"
+            className="text-xs text-text-soft hover:text-accent transition"
+          >
+            Home
+          </Link>
+          <div className="w-px h-4 bg-surface-border" />
+          <span className="text-sm font-semibold text-text">Create a lab</span>
+        </div>
+      </header>
+
+      <main className="flex-1 overflow-auto">
+        <div className="max-w-3xl mx-auto px-6 py-12">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-text">
+              How would you like to start?
+            </h1>
+            <p className="text-sm text-text-muted mt-2 max-w-lg mx-auto">
+              Pick an existing lab as a template and customise it for your
+              classroom, or start from scratch.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Template cards */}
+            {templates === null ? (
+              <div className="sm:col-span-2 text-center py-8 text-sm text-text-muted">
+                Loading templates...
+              </div>
+            ) : (
+              templates.map((t) => (
+                <button
+                  key={t.lab_id}
+                  type="button"
+                  disabled={loading !== null}
+                  onClick={() => {
+                    setLoading(t.lab_id);
+                    onPickTemplate(t.lab_id);
+                  }}
+                  className={cn(
+                    "text-left rounded-lg border p-5 transition group",
+                    loading === t.lab_id
+                      ? "border-accent bg-accent/5 cursor-wait"
+                      : "border-surface-border bg-surface hover:border-accent hover:shadow-sm",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="text-xs font-medium text-accent">
+                        Class {t.ncert_class} &middot;{" "}
+                        {SUBJECT_LABELS[t.subject] ?? t.subject}
+                      </span>
+                      <h3 className="text-sm font-semibold text-text mt-1">
+                        {t.topic}
+                      </h3>
+                    </div>
+                    {loading === t.lab_id && (
+                      <span className="text-xs text-accent shrink-0">Loading...</span>
+                    )}
+                  </div>
+                  {t.chapter_reference && (
+                    <p className="text-xs text-text-muted mt-2 line-clamp-2">
+                      {t.chapter_reference}
+                    </p>
+                  )}
+                  {t.estimated_duration_minutes && (
+                    <p className="text-xs text-text-soft mt-1">
+                      ~{t.estimated_duration_minutes} min
+                    </p>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+
+          {/* Start blank */}
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={onStartBlank}
+              disabled={loading !== null}
+              className="text-sm text-text-muted hover:text-accent transition"
+            >
+              or start from a blank lab
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /*  Step renderer                                                      */
@@ -36,16 +162,24 @@ function ActiveStep({
   stepId,
   state,
   onChange,
+  fromTemplate,
 }: {
   stepId: string;
   state: WizardState;
   onChange: (s: WizardState) => void;
+  fromTemplate: boolean;
 }) {
   switch (stepId) {
     case "about":
       return <StepAbout state={state} onChange={onChange} />;
     case "science":
-      return <StepScience state={state} onChange={onChange} />;
+      return (
+        <StepScience
+          state={state}
+          onChange={onChange}
+          readOnly={fromTemplate}
+        />
+      );
     case "phases":
       return <StepPhases state={state} onChange={onChange} />;
     case "tutor":
@@ -200,6 +334,8 @@ function StepIndicator({
 /* ------------------------------------------------------------------ */
 
 export function WizardShell() {
+  const [mode, setMode] = useState<"pick" | "wizard">("pick");
+  const [fromTemplate, setFromTemplate] = useState(false);
   const [state, setState] = useState<WizardState>(emptyWizardState);
   const [activeStepIdx, setActiveStepIdx] = useState(0);
   const [errors, setErrors] = useState<Array<{ path: string; message: string }>>(
@@ -207,6 +343,21 @@ export function WizardShell() {
   );
   const [savedLabId, setSavedLabId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const handlePickTemplate = useCallback((labId: string) => {
+    startTransition(async () => {
+      const templateState = await loadTemplate(labId);
+      setState(templateState);
+      setFromTemplate(true);
+      setMode("wizard");
+    });
+  }, []);
+
+  const handleStartBlank = useCallback(() => {
+    setState(emptyWizardState);
+    setFromTemplate(false);
+    setMode("wizard");
+  }, []);
 
   const activeStep = ALL_STEPS[activeStepIdx]!;
   const isReview = activeStep.id === REVIEW_STEP_ID;
@@ -243,6 +394,15 @@ export function WizardShell() {
     return <SuccessPanel labId={savedLabId} />;
   }
 
+  if (mode === "pick") {
+    return (
+      <TemplatePicker
+        onPickTemplate={handlePickTemplate}
+        onStartBlank={handleStartBlank}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-surface-muted flex flex-col">
       {/* Header */}
@@ -256,7 +416,20 @@ export function WizardShell() {
               Home
             </Link>
             <div className="w-px h-4 bg-surface-border" />
-            <span className="text-sm font-semibold text-text">Create a lab</span>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("pick");
+                setActiveStepIdx(0);
+              }}
+              className="text-xs text-text-soft hover:text-accent transition"
+            >
+              Templates
+            </button>
+            <div className="w-px h-4 bg-surface-border" />
+            <span className="text-sm font-semibold text-text">
+              {fromTemplate ? "Customise lab" : "Create a lab"}
+            </span>
           </div>
           {state.meta.topic && (
             <span className="text-xs text-text-muted truncate max-w-[200px]">
@@ -292,6 +465,7 @@ export function WizardShell() {
               stepId={activeStep.id}
               state={state}
               onChange={setState}
+              fromTemplate={fromTemplate}
             />
           )}
         </div>

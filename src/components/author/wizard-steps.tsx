@@ -638,9 +638,11 @@ function RawExpressionInput({
 export function StepScience({
   state,
   onChange,
+  readOnly = false,
 }: {
   state: WizardState;
   onChange: (s: WizardState) => void;
+  readOnly?: boolean;
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
@@ -731,6 +733,95 @@ export function StepScience({
       rules: state.rules.filter((r) => r.decision_table_ref !== table.id),
     });
   };
+
+  if (readOnly) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm text-amber-800">
+            The science model comes from the template and is pre-validated.
+            You can customise everything else &mdash; prompts, scaffolding,
+            assessment &mdash; without worrying about the underlying science.
+          </p>
+        </div>
+
+        <Section title="Variables" description="Pre-configured from template" defaultOpen={false}>
+          {state.variables.length === 0 ? (
+            <p className="text-sm text-text-muted">No variables defined.</p>
+          ) : (
+            <div className="space-y-2">
+              {state.variables.map((v) => (
+                <div
+                  key={v.id}
+                  className="flex items-center gap-3 rounded-md border border-surface-border bg-surface-muted/30 px-3 py-2"
+                >
+                  <span className="font-mono text-sm text-accent">{v.id}</span>
+                  <span className="text-sm text-text">{v.label}</span>
+                  <span className="text-xs text-text-soft capitalize">
+                    {v.role} &middot; {v.type}
+                    {v.unit ? ` (${v.unit})` : ""}
+                  </span>
+                  {v.type === "number" && v.range && (
+                    <span className="text-xs text-text-soft ml-auto">
+                      {v.range[0]}&#8211;{v.range[1]}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        <Section title="Computation Rules" description="Pre-configured from template" defaultOpen={false}>
+          {state.rules.length === 0 ? (
+            <p className="text-sm text-text-muted">No rules defined.</p>
+          ) : (
+            <div className="space-y-2">
+              {state.rules.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-md border border-surface-border bg-surface-muted/30 px-3 py-2 space-y-1"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm text-accent">{r.id}</span>
+                    <span className="text-xs text-text-muted">{r.description}</span>
+                  </div>
+                  {r.expression && (
+                    <div className="font-mono text-xs text-text-soft bg-surface-muted rounded px-2 py-1">
+                      {r.expression}
+                    </div>
+                  )}
+                  {r.decision_table_ref && (
+                    <div className="text-xs text-text-soft">
+                      Uses table: <span className="font-mono">{r.decision_table_ref}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        {state.decision_tables.length > 0 && (
+          <Section title="Decision Tables" description="Pre-configured from template" defaultOpen={false}>
+            <div className="space-y-2">
+              {state.decision_tables.map((t) => (
+                <div
+                  key={t.id}
+                  className="rounded-md border border-surface-border bg-surface-muted/30 px-3 py-2"
+                >
+                  <span className="font-mono text-sm text-accent">{t.id}</span>
+                  <span className="text-xs text-text-muted ml-2">
+                    {t.inputs.join(", ")} &rarr; {t.output} ({t.rows.length} rows)
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
