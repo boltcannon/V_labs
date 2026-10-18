@@ -52,6 +52,8 @@ export interface GraphPoint {
   runNumber: number;
   x: number;
   y: number;
+  /** The student's expected y for this run, if given for this y variable. */
+  expected?: number;
 }
 
 /** The current tab's runs where the engine defined both values. */
@@ -68,7 +70,14 @@ export function graphPoints(
     const oy = run.outputs[y];
     if (ox?.status !== "defined" || oy?.status !== "defined") return;
     if (typeof ox.value !== "number" || typeof oy.value !== "number") return;
-    out.push({ runId: run.id, runNumber: i + 1, x: ox.value, y: oy.value });
+    const exp = run.expectation?.y_variable === y ? run.expectation.value : undefined;
+    out.push({
+      runId: run.id,
+      runNumber: i + 1,
+      x: ox.value,
+      y: oy.value,
+      ...(exp !== undefined ? { expected: exp } : {}),
+    });
   });
   return out;
 }

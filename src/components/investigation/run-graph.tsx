@@ -31,7 +31,10 @@ const withUnit = (value: number, v: Variable) =>
 
 export function RunGraph({ points, xVar, yVar, latestRunId }: Props) {
   const [x0, x1] = axisDomain(points.map((p) => p.x));
-  const [y0, y1] = axisDomain(points.map((p) => p.y));
+  // Expected values count toward the y range, so a ghost is never off the plot.
+  const [y0, y1] = axisDomain(
+    points.flatMap((p) => (p.expected !== undefined ? [p.y, p.expected] : [p.y])),
+  );
   const px = (x: number) => PAD.left + ((x - x0) / (x1 - x0)) * PLOT_W;
   const py = (y: number) => PAD.top + PLOT_H - ((y - y0) / (y1 - y0)) * PLOT_H;
   const ticks = (lo: number, hi: number) => [lo, (lo + hi) / 2, hi];
@@ -78,6 +81,37 @@ export function RunGraph({ points, xVar, yVar, latestRunId }: Props) {
         >
           {axisLabel(yVar)}
         </text>
+
+        {/* Expected points: a hollow ghost at what the student expected, and
+            a dashed line to the engine's value. Ungraded; drawn under the
+            real points. */}
+        {points.map((p) =>
+          p.expected === undefined ? null : (
+            <g key={`exp-${p.runId}`}>
+              <line
+                data-part="gap"
+                x1={px(p.x)}
+                x2={px(p.x)}
+                y1={py(p.expected)}
+                y2={py(p.y)}
+                stroke="#94a3b8"
+                strokeDasharray="3 3"
+              />
+              <g data-part="expected" data-run={p.runNumber}>
+                <title>{`Run ${p.runNumber}: you expected ${yVar.label} = ${withUnit(p.expected, yVar)}`}</title>
+                <circle
+                  cx={px(p.x)}
+                  cy={py(p.expected)}
+                  r={5.5}
+                  fill="none"
+                  stroke="#4f46e5"
+                  strokeWidth={1.5}
+                  strokeDasharray="2 2"
+                />
+              </g>
+            </g>
+          ),
+        )}
 
         {/* Points */}
         {points.map((p) => {

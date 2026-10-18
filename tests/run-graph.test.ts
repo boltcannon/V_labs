@@ -117,6 +117,60 @@ describe("run graph — points", () => {
 });
 
 /* ------------------------------------------------------------------ */
+/* Expected points (ungraded "ghost")                                   */
+/* ------------------------------------------------------------------ */
+
+describe("run graph — expected points", () => {
+  const withExpectation = (r: ExperimentRun, y_variable: string, value: number): ExperimentRun => ({
+    ...r,
+    expectation: { y_variable, value },
+  });
+
+  it("a point carries the student's expectation when it was made for the plotted y variable", () => {
+    const runs = [
+      withExpectation(run("a", "t", { speed: 10, distance: 100 }), "distance", 80),
+      withExpectation(run("b", "t", { speed: 5, distance: 50, average_speed: 5 }), "average_speed", 7),
+      run("c", "t", { speed: 2, distance: 20 }),
+    ];
+    expect(graphPoints(runs, "t", "speed", "distance")).toEqual([
+      { runId: "a", runNumber: 1, x: 10, y: 100, expected: 80 },
+      { runId: "b", runNumber: 2, x: 5, y: 50 },
+      { runId: "c", runNumber: 3, x: 2, y: 20 },
+    ]);
+  });
+
+  it("draws a hollow ghost at the expected value with a dashed gap line to the real point", () => {
+    const speed = c9vars.find((v) => v.id === "speed") as Variable;
+    const distance = c9vars.find((v) => v.id === "distance") as Variable;
+    const html = renderToStaticMarkup(createElement(RunGraph, {
+      points: [
+        { runId: "a", runNumber: 1, x: 10, y: 100, expected: 80 },
+        { runId: "c", runNumber: 3, x: 2, y: 20 },
+      ],
+      xVar: speed,
+      yVar: distance,
+    }));
+    expect(html.match(/data-part="expected"/g)).toHaveLength(1);
+    expect(html.match(/data-part="gap"/g)).toHaveLength(1);
+    expect(html).toContain("Run 1: you expected Distance covered = 80 m");
+    // The real value is still shown exactly.
+    expect(html).toContain("Run 1: Speed = 10 m/s, Distance covered = 100 m");
+  });
+
+  it("keeps an expected value inside the axis even when it is far above the real points", () => {
+    const speed = c9vars.find((v) => v.id === "speed") as Variable;
+    const distance = c9vars.find((v) => v.id === "distance") as Variable;
+    const html = renderToStaticMarkup(createElement(RunGraph, {
+      points: [{ runId: "a", runNumber: 1, x: 10, y: 10, expected: 1000 }],
+      xVar: speed,
+      yVar: distance,
+    }));
+    const cy = /data-part="expected"[^>]*>\s*<title>[^<]*<\/title>\s*<circle[^>]*cy="([^"]+)"/.exec(html)?.[1];
+    expect(Number(cy)).toBeGreaterThanOrEqual(16); // PAD.top — on the plot, not above it
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /* Release-to-run: which keys count as a slider release                 */
 /* ------------------------------------------------------------------ */
 

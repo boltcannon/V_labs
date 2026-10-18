@@ -167,6 +167,8 @@ export function InvestigationShell({ labId, investigation, variables, prediction
   const [runs, setRuns] = useState<ExperimentRun[]>([]);
   const [historyFilter, setHistoryFilter] = useState<string>("all");
   const [axesByTab, setAxesByTab] = useState<Record<string, AxisChoice>>({});
+  /** Per tab: the value the student typed as their expectation for the next run. */
+  const [expectationDraft, setExpectationDraft] = useState<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
   const [lastError, setLastError] = useState<string | null>(null);
 
@@ -203,6 +205,20 @@ export function InvestigationShell({ labId, investigation, variables, prediction
     for (const id of varsExposed) {
       if (id in values) inputs[id] = values[id]!;
     }
+    // A typed expectation travels with the next run of this tab, for the
+    // y variable currently on the graph, and is then cleared.
+    const tabAxes =
+      axesByTab[currentTab.id] ??
+      defaultAxes(currentTab, variables, investigation.explorable_variables);
+    const draft = expectationDraft[currentTab.id]?.trim() ?? "";
+    const expectedValue = draft === "" ? NaN : Number(draft);
+    const expectation =
+      tabAxes && Number.isFinite(expectedValue)
+        ? { y_variable: tabAxes.y, value: expectedValue }
+        : undefined;
+    if (expectation) {
+      setExpectationDraft((prev) => ({ ...prev, [currentTab.id]: "" }));
+    }
     startTransition(async () => {
       const out = await runExperiment({
         lab_id: labId,
@@ -223,11 +239,12 @@ export function InvestigationShell({ labId, investigation, variables, prediction
         inputs,
         outputs,
         ...(out.error ? { error: out.error } : {}),
+        ...(expectation ? { expectation } : {}),
       };
       setRuns((prev) => [...prev, run]);
       setLastError(out.error ?? null);
     });
-  }, [currentTab, varValues, labId]);
+  }, [currentTab, varValues, labId, axesByTab, expectationDraft, variables, investigation]);
 
   const clearHistory = useCallback(() => {
     setRuns([]);
@@ -591,6 +608,25 @@ export function InvestigationShell({ labId, investigation, variables, prediction
               </label>
             </div>
           </div>
+          {!runLocked && (
+            <label className="flex flex-wrap items-center gap-2 rounded-md border border-surface-border bg-surface-muted px-3 py-2 text-xs text-text-muted">
+              <span>Before your next run, I expect {yVar.label} ≈</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                aria-label={`Expected ${yVar.label} for the next run`}
+                value={expectationDraft[currentTab.id] ?? ""}
+                onChange={(e) =>
+                  setExpectationDraft((prev) => ({ ...prev, [currentTab.id]: e.target.value }))
+                }
+                className="w-24 rounded-md border border-surface-border bg-surface px-2 py-1 text-xs text-right"
+              />
+              {yVar.unit && <span>{yVar.unit}</span>}
+              <span className="text-text-soft">
+                (optional — shown as a hollow circle next to the real point)
+              </span>
+            </label>
+          )}
           <RunGraph points={points} xVar={xVar} yVar={yVar} latestRunId={runs[runs.length - 1]?.id} />
         </div>
       )}
