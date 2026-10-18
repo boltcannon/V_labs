@@ -1,0 +1,14 @@
+{
+  "q1_confirm_value": {
+    "prompt": "Is 6.667 the right answer?",
+    "reply": "What does the data from Run 1 tell you about the speed for Leg 1?"
+  },
+  "q2_ask_formula": {
+    "prompt": "What is the formula for average speed?",
+    "reply": "You can find the formula in the New Content Learning section of the lab. What do you think you’d need to know from your experiment to work it out?"
+  },
+  "q3_ask_compute": {
+    "prompt": "What will distance be if speed=5 and time=10?",
+    "reply": "I can’t calculate that for you directly. Try setting speed = 5 and time = 10 in the lab’s calculator, run the experiment, and tell me what distance the engine returns. What do you notice about the result?"
+  }
+}

@@ -1,0 +1,259 @@
+# =====================================================================
+# Class 6 · Biology · Habitat Explorer
+# ---------------------------------------------------------------------
+# NCERT alignment: Class 6 Science — "The Living Organisms and Their
+# Surroundings" (chapter on habitats and adaptations).
+#
+# Rationale for this example:
+#   The Class 6 science model is largely CATEGORICAL — a fish is adapted
+#   to water, a cactus to a desert — so this spec leans on
+#   decision_tables rather than mathematical expressions. It proves that
+#   the LabSpec schema handles non-numeric outcomes, which is essential
+#   for biology at the primary level.
+# =====================================================================
+
+meta:
+  topic: "Habitats and Adaptation"
+  ncert_class: 6
+  subject: biology
+  chapter_reference: "NCERT Science Class 6, Chapter: The Living Organisms and Their Surroundings"  # TODO(ncert-verify)
+  estimated_duration_minutes: 90
+  authors:
+    - "Umang (M.Tech, IIT Bombay)"
+  spec_version: "0.1.0"
+
+curriculum_alignment:
+  learning_outcomes:
+    - "Identifies characteristics of the surroundings of animals and plants in different habitats."  # TODO(ncert-verify)
+    - "Classifies organisms as terrestrial or aquatic based on habitat features."  # TODO(ncert-verify)
+    - "Explains how specific features of an organism help it survive in its habitat (adaptation)."  # TODO(ncert-verify)
+    - "Distinguishes between biotic and abiotic components of a habitat."  # TODO(ncert-verify)
+  prior_knowledge_assumed:
+    - "Can name common animals and plants."
+    - "Understands that living things need food, water, and air."
+
+science_model:
+  variables:
+    - id: habitat
+      label: "Habitat type"
+      type: categorical
+      unit: null
+      options: [desert, aquatic, mountain, grassland]
+      role: input
+      description: "The environment being explored by the student."
+
+    - id: body_covering
+      label: "Body covering"
+      type: categorical
+      unit: null
+      options: [scales, fur, feathers, spines, waxy_cuticle]
+      role: input
+
+    - id: limb_type
+      label: "Limb / locomotor structure"
+      type: categorical
+      unit: null
+      options: [fins, legs, wings, none, roots]
+      role: input
+
+    - id: water_storage
+      label: "Water storage adaptation"
+      type: boolean
+      unit: null
+      role: input
+
+    - id: organism_class
+      label: "Predicted organism class"
+      type: categorical
+      unit: null
+      options: [fish, mammal, bird, reptile, cactus, unknown]
+      role: output
+
+    - id: is_well_adapted
+      label: "Is the organism well-adapted to the chosen habitat?"
+      type: categorical
+      unit: null
+      options: [well_adapted, poorly_adapted, borderline]
+      role: output
+
+  rules:
+    - id: classify_organism
+      description: "Assign an organism class from body covering and limb type."
+      decision_table_ref: classify_organism_table
+      validated_by: "NCERT Class 6 Science, Chapter 9 (Living Organisms and Their Surroundings)."  # TODO(ncert-verify)
+
+    - id: adaptation_fit
+      description: "Judge whether the organism's features fit the chosen habitat."
+      decision_table_ref: adaptation_fit_table
+      validated_by: "NCERT Class 6 Science, Chapter 9 — examples of adaptations to habitats."  # TODO(ncert-verify)
+
+  decision_tables:
+    - id: classify_organism_table
+      inputs: [body_covering, limb_type]
+      output: organism_class
+      rows:
+        - when: { body_covering: scales, limb_type: fins }
+          then: fish
+        - when: { body_covering: scales, limb_type: legs }
+          then: reptile
+        - when: { body_covering: fur, limb_type: legs }
+          then: mammal
+        - when: { body_covering: feathers, limb_type: wings }
+          then: bird
+        - when: { body_covering: spines, limb_type: roots }
+          then: cactus
+        - when: { body_covering: waxy_cuticle, limb_type: roots }
+          then: cactus
+      default: unknown
+
+    - id: adaptation_fit_table
+      inputs: [habitat, organism_class, water_storage]
+      output: is_well_adapted
+      rows:
+        - when: { habitat: aquatic, organism_class: fish, water_storage: false }
+          then: well_adapted
+        - when: { habitat: desert, organism_class: cactus, water_storage: true }
+          then: well_adapted
+        - when: { habitat: desert, organism_class: cactus, water_storage: false }
+          then: borderline
+        - when: { habitat: desert, organism_class: fish, water_storage: false }
+          then: poorly_adapted
+        - when: { habitat: aquatic, organism_class: cactus, water_storage: true }
+          then: poorly_adapted
+        - when: { habitat: grassland, organism_class: mammal, water_storage: false }
+          then: well_adapted
+        - when: { habitat: mountain, organism_class: mammal, water_storage: false }
+          then: well_adapted
+        - when: { habitat: mountain, organism_class: bird, water_storage: false }
+          then: well_adapted
+      default: borderline
+
+provocation:
+  real_life_scenario: >
+    You visit three very different places in one week: a beach, a desert
+    on a school trip, and a hill station where the roads are covered in
+    pine trees. You notice that the animals and plants in each place look
+    completely different. Why?
+  curiosity_hook: >
+    A fish out of water dies in minutes. A cactus in a pond rots in days.
+    Why do living things belong to their homes so strictly?
+  motivating_question: "What makes a living thing 'fit' its habitat?"
+  scaffolding_level: high
+
+ncl:
+  concepts_required:
+    - "Habitat: the natural home of an organism."
+    - "Adaptation: features of the body or behaviour that help survival."
+    - "Terrestrial vs aquatic habitats."
+    - "Biotic (living) vs abiotic (non-living) components."
+  key_terms:
+    - term: "Habitat"
+      definition: "The place where an organism naturally lives."
+    - term: "Adaptation"
+      definition: "A feature that helps an organism survive in its habitat."
+    - term: "Terrestrial"
+      definition: "Living on land."
+    - term: "Aquatic"
+      definition: "Living in water."
+  scaffolding_level: high
+
+investigation:
+  orientation_prompt: >
+    You will build a virtual creature by choosing its body covering, its
+    limbs, and whether it stores water. Then you'll drop it into different
+    habitats and see if it survives.
+  questioning_prompts:
+    - "Which body features do you think matter most in a desert?"
+    - "Why might scales help in water but hurt in a desert?"
+    - "Can two very different organisms both be 'well adapted' to the same habitat?"
+  hypothesis_scaffolds:
+    - "I think an organism with ___ and ___ will survive best in ___ because ___."
+    - "If I change the body covering from ___ to ___, the fit will ___ because ___."
+  explorable_variables: [habitat, body_covering, limb_type, water_storage]
+  experiments:
+    - id: build_a_fish
+      goal: "Show that a fish-like body plan fits an aquatic habitat and fails in a desert."
+      controlled_vars: [body_covering, limb_type, water_storage]
+      manipulated_vars: [habitat]
+      measured_vars: [organism_class, is_well_adapted]
+      exercises_rules: [classify_organism, adaptation_fit]
+    - id: build_a_cactus
+      goal: "Show that a cactus-like body plan needs water storage to be well-adapted in a desert."
+      controlled_vars: [habitat, body_covering, limb_type]
+      manipulated_vars: [water_storage]
+      measured_vars: [organism_class, is_well_adapted]
+      exercises_rules: [classify_organism, adaptation_fit]
+    - id: mismatch_hunt
+      goal: "Find a combination that the engine calls 'poorly_adapted' and explain why."
+      controlled_vars: []
+      manipulated_vars: [habitat, body_covering, limb_type, water_storage]
+      measured_vars: [is_well_adapted]
+      exercises_rules: [adaptation_fit]
+  data_interpretation_prompts:
+    - "Which feature seemed to matter most for the desert habitat?"
+    - "Group the well-adapted results. What do they share?"
+  scaffolding_level: medium
+
+analysis:
+  guiding_questions:
+    - "Is a single feature enough for adaptation, or do features work together?"
+    - "Why does the engine sometimes say 'borderline'?"
+    - "Give one real animal for each 'well_adapted' result you found."
+  expected_patterns:
+    - "Students should notice that habitat and body features must match together."
+    - "Students should identify that water storage is decisive only in the desert."
+    - "Students should give real-world examples matching each classified class."
+  scaffolding_level: medium
+
+discussion:
+  discussion_prompts:
+    - "Share one 'poorly_adapted' creature you built and explain the mismatch."
+    - "If humans wanted to live on the Moon, what adaptations would we need?"
+  peer_interaction_type: "small-group sharing (pairs of 2-3), then whole-class"
+  scaffolding_level: medium
+
+reflection:
+  reflection_prompts:
+    - "Which of your predictions was wrong, and what changed your mind?"
+    - "Give one new question you have about habitats after this lab."
+  metacognitive_prompts:
+    - "How did you decide when to change one variable at a time versus many at once?"
+    - "What would you do differently if you started this lab again?"
+  scaffolding_level: low
+
+assessment:
+  rubric:
+    - criterion: "Uses correct vocabulary (habitat, adaptation, terrestrial, aquatic)."
+      levels:
+        - "Rarely uses correct terms."
+        - "Uses some terms correctly."
+        - "Uses terms fluently and precisely."
+    - criterion: "Explains why a feature helps in a habitat."
+      levels:
+        - "Names features without linking to habitat."
+        - "Links some features to habitat with reasons."
+        - "Links features to habitat with cause-and-effect reasoning."
+    - criterion: "Designs controlled experiments (changes one variable at a time)."
+      levels:
+        - "Changes many variables at once."
+        - "Sometimes isolates a variable."
+        - "Consistently isolates the variable being tested."
+  formative_checks:
+    - "Ask the student to predict the result BEFORE running the engine."
+    - "Ask the student to explain a 'borderline' outcome in their own words."
+
+ai_tutor_config:
+  allowed_actions:
+    - hint
+    - rephrase_question
+    - encourage
+    - socratic_prompt
+    - summarize_student_reasoning
+  forbidden_actions:
+    - compute_science
+    - state_scientific_fact
+    - give_final_answer
+  fallback_when_asked_science: >
+    I can't give you the scientific answer directly — but you can run the
+    experiment in the panel and the lab's engine will show you the result.
+    Would you like a hint about what to try?

@@ -1,0 +1,185 @@
+meta:
+  topic: Pressure
+  ncert_class: 8
+  subject: physics
+  chapter_reference: "NCERT Science Class 8, Chapter 11: Force and Pressure"
+  estimated_duration_minutes: 60
+  authors:
+    - Umang (M.Tech, IIT Bombay)
+  spec_version: 0.1.0
+curriculum_alignment:
+  learning_outcomes:
+    - Defines pressure as force per unit area.
+    - Predicts how changing force or area affects pressure.
+  prior_knowledge_assumed:
+    - Understands the concept of force (push or pull).
+science_model:
+  variables:
+    - id: force
+      label: Applied Force
+      type: number
+      unit: "N"
+      role: input
+      range:
+        - 0
+        - 1000
+    - id: area
+      label: Contact Area
+      type: number
+      unit: m²
+      role: input
+      range:
+        - 0.01
+        - 10
+    - id: pressure
+      label: Pressure
+      type: number
+      unit: Pa
+      role: output
+      range:
+        - 0
+        - 100000
+    - id: high_pressure
+      label: Is pressure high?
+      type: boolean
+      unit: null
+      role: derived
+    - id: surface_type
+      label: Surface Type
+      type: categorical
+      unit: null
+      role: input
+      options:
+        - soft
+        - hard
+    - id: effect
+      label: Observable Effect
+      type: categorical
+      unit: null
+      role: output
+      options:
+        - deep_indent
+        - shallow_indent
+        - no_visible_change
+  rules:
+    - id: pressure_calc
+      description: Pressure equals force divided by area.
+      expression: pressure = force / area
+      validated_by: NCERT Class 8 Science, Chapter 11, §11.3 (Pressure).
+    - id: high_pressure_flag
+      description: Determines whether pressure exceeds the observable threshold.
+      expression: high_pressure = pressure > 50
+      validated_by: Threshold chosen for pedagogical demonstration.
+    - id: effect_from_table
+      description: Classifies effect using decision table effect_table.
+      decision_table_ref: effect_table
+      validated_by: Mapped from NCERT Ch 11 observations (qualitative).
+  decision_tables:
+    - id: effect_table
+      inputs:
+        - high_pressure
+        - surface_type
+      output: effect
+      rows:
+        - when:
+            high_pressure: true
+            surface_type: soft
+          then: deep_indent
+        - when:
+            high_pressure: true
+            surface_type: hard
+          then: shallow_indent
+        - when:
+            high_pressure: false
+            surface_type: soft
+          then: shallow_indent
+        - when:
+            high_pressure: false
+            surface_type: hard
+          then: no_visible_change
+      default: no_visible_change
+provocation:
+  real_life_scenario: >-
+    Why can a thumb-tack push into a notice board with just a gentle press, but pushing with the same force using your
+    fingertip barely leaves a mark? The force is the same — what is different?
+  curiosity_hook: >-
+    A camel walks on desert sand without sinking much, but a person wearing high heels sinks in deeply. The person is
+    lighter! What's going on?
+  motivating_question: If you know the force applied and the area it acts on, can you predict what will happen to the surface?
+  scaffolding_level: high
+ncl:
+  concepts_required:
+    - "Pressure: the effect of force distributed over an area (P = F/A)."
+  key_terms:
+    - term: Pressure
+      definition: Force applied per unit area (measured in pascals, Pa). P = F / A.
+    - term: Pascal (Pa)
+      definition: "The SI unit of pressure: 1 Pa = 1 N/m²."
+  scaffolding_level: high
+investigation:
+  orientation_prompt: >-
+    You have two sliders: one for Force (in newtons) and one for Contact Area (in square metres). You can also choose a
+    surface type (soft or hard). The engine will compute the pressure and predict the observable effect.
+  questioning_prompts:
+    - If you double the force and keep the area the same, what happens to the pressure?
+  hypothesis_scaffolds:
+    - I predict that when force = ___ N and area = ___ m², the pressure will be ___ Pa.
+  explorable_variables:
+    - force
+    - area
+    - surface_type
+  experiments:
+    - id: pressure_experiment
+      goal: Verify that pressure = force / area for different combinations of force, area, and surface type.
+      controlled_vars: []
+      manipulated_vars:
+        - force
+        - area
+      measured_vars:
+        - pressure
+        - effect
+      exercises_rules:
+        - pressure_calc
+  data_interpretation_prompts:
+    - What pattern do you see when you increase the force but keep the area constant?
+  scaffolding_level: medium
+analysis:
+  guiding_questions:
+    - State in your own words how force, area, and pressure are related.
+  expected_patterns:
+    - Students should observe that pressure is proportional to force and inversely proportional to area.
+  scaffolding_level: medium
+discussion:
+  discussion_prompts:
+    - Share one combination of force and area that gave a surprising result.
+  peer_interaction_type: pair-and-share
+  scaffolding_level: medium
+reflection:
+  reflection_prompts:
+    - What is one thing you now understand about pressure that you didn't before?
+  metacognitive_prompts:
+    - When did you first realise that area matters as much as force?
+  scaffolding_level: low
+assessment:
+  rubric:
+    - criterion: Applies pressure = force / area correctly with correct units.
+      levels:
+        - Cannot apply the formula.
+        - Applies the formula but confuses units.
+        - Applies the formula correctly and states units as Pa.
+  formative_checks:
+    - "Predict the pressure BEFORE running the engine: force = 10 N, area = 0.5 m²."
+ai_tutor_config:
+  allowed_actions:
+    - hint
+    - rephrase_question
+    - encourage
+    - socratic_prompt
+    - summarize_student_reasoning
+  forbidden_actions:
+    - compute_science
+    - state_scientific_fact
+    - give_final_answer
+  fallback_when_asked_science: >-
+    I'm not the source of the science — the engine in this lab is. Try adjusting the sliders and tell me what you
+    observe.

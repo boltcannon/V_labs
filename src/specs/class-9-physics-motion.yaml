@@ -1,0 +1,322 @@
+# =====================================================================
+# Class 9 · Physics · Motion
+# ---------------------------------------------------------------------
+# NCERT alignment: Class 9 Science — Chapter 8 "Motion". Covers uniform
+# vs. non-uniform motion, distance-time and speed-time relationships,
+# and average speed.
+#
+# Rationale for this example:
+#   Class 9 physics is dominated by MATHEMATICAL relationships, so this
+#   spec leans on `expression` rules (distance = speed * time; average
+#   speed = total distance / total time). Together with the Class 6
+#   biology spec (which leans on decision_tables), it demonstrates that
+#   the same LabSpec schema and the same rule engine cover both
+#   quantitative and categorical science without any code change.
+# =====================================================================
+
+meta:
+  topic: "Uniform and Non-uniform Motion"
+  ncert_class: 9
+  subject: physics
+  chapter_reference: "NCERT Science Class 9, Chapter 8: Motion"  # TODO(ncert-verify)
+  estimated_duration_minutes: 120
+  authors:
+    - "Umang (M.Tech, IIT Bombay)"
+  spec_version: "0.1.0"
+
+curriculum_alignment:
+  learning_outcomes:
+    - "Distinguishes between distance and displacement, and speed and velocity."  # TODO(ncert-verify)
+    - "Uses the relation distance = speed × time to solve problems on uniform motion."  # TODO(ncert-verify)
+    - "Interprets distance–time and speed–time graphs to describe motion."  # TODO(ncert-verify)
+    - "Computes average speed from total distance and total time."  # TODO(ncert-verify)
+    - "Identifies uniform and non-uniform motion from data."  # TODO(ncert-verify)
+  prior_knowledge_assumed:
+    - "Understands units of length (m, km) and time (s, min, h)."
+    - "Can plot points on a coordinate grid."
+    - "Can compute simple ratios."
+
+science_model:
+  variables:
+    - id: speed
+      label: "Speed"
+      type: number
+      unit: "m/s"
+      range: [0, 100]
+      role: input
+      description: "Constant speed for a uniform-motion segment."
+
+    - id: time
+      label: "Time elapsed"
+      type: number
+      unit: "s"
+      range: [0, 3600]
+      role: input
+
+    - id: distance
+      label: "Distance covered"
+      type: number
+      unit: "m"
+      range: [0, 360000]
+      role: output
+
+    - id: leg1_distance
+      label: "Leg 1 distance"
+      type: number
+      unit: "m"
+      range: [0, 200000]
+      role: input
+
+    - id: leg1_time
+      label: "Leg 1 time"
+      type: number
+      unit: "s"
+      range: [0, 3600]
+      role: input
+
+    - id: leg2_distance
+      label: "Leg 2 distance"
+      type: number
+      unit: "m"
+      range: [0, 200000]
+      role: input
+
+    - id: leg2_time
+      label: "Leg 2 time"
+      type: number
+      unit: "s"
+      range: [0, 3600]
+      role: input
+
+    - id: average_speed
+      label: "Average speed over both legs"
+      type: number
+      unit: "m/s"
+      range: [0, 200]
+      role: output
+
+    - id: motion_class
+      label: "Motion classification"
+      type: categorical
+      unit: null
+      options: [uniform, non_uniform, at_rest]
+      role: output
+
+    - id: speed_leg1
+      label: "Speed on leg 1"
+      type: number
+      unit: "m/s"
+      range: [0, 200]
+      role: derived
+
+    - id: speed_leg2
+      label: "Speed on leg 2"
+      type: number
+      unit: "m/s"
+      range: [0, 200]
+      role: derived
+
+    - id: both_zero
+      label: "Both leg speeds are zero (i.e., object is at rest)"
+      type: boolean
+      unit: null
+      role: derived
+
+    - id: speeds_equal
+      label: "Leg speeds are equal (within tolerance)"
+      type: boolean
+      unit: null
+      role: derived
+
+  rules:
+    - id: distance_from_speed_time
+      description: "For uniform motion, distance covered equals speed times time."
+      expression: "distance = speed * time"
+      validated_by: "NCERT Class 9 Science, Chapter 8, §8.4 (Rate of change of distance)."  # TODO(ncert-verify)
+
+    - id: average_speed_over_two_legs
+      description: "Average speed is total distance divided by total time, not the average of the two speeds."
+      expression: "average_speed = (leg1_distance + leg2_distance) / (leg1_time + leg2_time)"
+      validated_by: "NCERT Class 9 Science, Chapter 8, §8.4."  # TODO(ncert-verify)
+
+    - id: speed_leg1_calc
+      description: "Speed on leg 1 (for the uniform/non-uniform check)."
+      expression: "speed_leg1 = leg1_distance / leg1_time"
+      validated_by: "Definition of speed (NCERT §8.4)."  # TODO(ncert-verify)
+
+    - id: speed_leg2_calc
+      description: "Speed on leg 2 (for the uniform/non-uniform check)."
+      expression: "speed_leg2 = leg2_distance / leg2_time"
+      validated_by: "Definition of speed (NCERT §8.4)."  # TODO(ncert-verify)
+
+    - id: both_zero_flag
+      description: "Compute whether both leg speeds are zero."
+      expression: "both_zero = (speed_leg1 == 0) and (speed_leg2 == 0)"
+      validated_by: "Definition of 'at rest' (NCERT §8.2)."  # TODO(ncert-verify)
+
+    - id: speeds_equal_flag
+      description: "Compute whether leg speeds are equal (tolerance 0.001 m/s to allow for floating-point noise)."
+      expression: "speeds_equal = abs(speed_leg1 - speed_leg2) < 0.001"
+      validated_by: "Definition of uniform motion (NCERT §8.3)."  # TODO(ncert-verify)
+
+    - id: classify_motion
+      description: "Motion is uniform if leg speeds match, at_rest if both are zero, otherwise non_uniform."
+      decision_table_ref: motion_class_table
+      validated_by: "NCERT Class 9 Science, Chapter 8, §8.3 (Uniform and Non-uniform Motion)."  # TODO(ncert-verify)
+
+  decision_tables:
+    - id: motion_class_table
+      # Inputs are two derived booleans computed upstream by the
+      # `both_zero_flag` and `speeds_equal_flag` expression rules. This
+      # is the pattern by which mathematical rules feed categorical
+      # rules in the same spec.
+      inputs: [both_zero, speeds_equal]
+      output: motion_class
+      rows:
+        - when: { both_zero: true, speeds_equal: true }
+          then: at_rest
+        - when: { both_zero: false, speeds_equal: true }
+          then: uniform
+        - when: { both_zero: false, speeds_equal: false }
+          then: non_uniform
+      default: non_uniform
+
+provocation:
+  real_life_scenario: >
+    You cycle to school in two stretches: a flat road for the first 500 m
+    and an uphill road for the next 500 m. It takes you 50 s on the flat
+    stretch and 100 s uphill. Your friend says "your average speed was
+    7.5 m/s" (the arithmetic mean of 10 and 5). Is your friend correct?
+  curiosity_hook: >
+    Two runners cover the same distance in the same total time — one at
+    a steady pace, one who sprints then walks. Their average speeds are
+    equal, but their motion is not. How can that be?
+  motivating_question: >
+    Given only distance and time, how do we decide whether motion is
+    uniform or non-uniform?
+  scaffolding_level: high
+
+ncl:
+  concepts_required:
+    - "Speed: the rate at which an object covers distance."
+    - "Uniform motion: equal distances in equal intervals of time."
+    - "Non-uniform motion: unequal distances in equal intervals of time."
+    - "Average speed: total distance divided by total time."
+  key_terms:
+    - term: "Speed"
+      definition: "Distance travelled per unit time."
+    - term: "Uniform motion"
+      definition: "Motion in which speed does not change with time."
+    - term: "Non-uniform motion"
+      definition: "Motion in which speed changes with time."
+    - term: "Average speed"
+      definition: "Total distance divided by total time, over a journey."
+  scaffolding_level: high
+
+investigation:
+  orientation_prompt: >
+    You have two levers: a "speed" dial and a "time" dial. You can also
+    run a two-leg journey by setting the distance and time for each leg
+    separately. The engine will compute the outcomes for you.
+  questioning_prompts:
+    - "If you double the time and keep the speed the same, what happens to the distance?"
+    - "If leg 1 is fast and leg 2 is slow, will the average speed sit exactly in the middle?"
+    - "Can two journeys have the same average speed but different types of motion?"
+  hypothesis_scaffolds:
+    - "If the two leg speeds are ___, the motion will be classified as ___."
+    - "I predict the average speed will be ___ m/s because ___."
+  explorable_variables:
+    - speed
+    - time
+    - leg1_distance
+    - leg1_time
+    - leg2_distance
+    - leg2_time
+  experiments:
+    - id: uniform_baseline
+      goal: "Verify that distance = speed * time for a range of speeds."
+      controlled_vars: [time]
+      manipulated_vars: [speed]
+      measured_vars: [distance]
+      exercises_rules: [distance_from_speed_time]
+    - id: average_speed_puzzle
+      goal: "Compute the average speed of a two-leg journey and compare it to the mean of the leg speeds."
+      controlled_vars: [leg1_distance, leg2_distance]
+      manipulated_vars: [leg1_time, leg2_time]
+      measured_vars: [average_speed, speed_leg1, speed_leg2]
+      exercises_rules: [average_speed_over_two_legs, speed_leg1_calc, speed_leg2_calc]
+    - id: uniform_vs_nonuniform
+      goal: "Classify a journey as uniform, non-uniform, or at rest from its two leg speeds."
+      controlled_vars: []
+      manipulated_vars: [leg1_distance, leg1_time, leg2_distance, leg2_time]
+      measured_vars: [motion_class]
+      exercises_rules: [classify_motion]
+  data_interpretation_prompts:
+    - "Plot distance vs time for the uniform_baseline runs. What kind of graph do you get?"
+    - "Compare average_speed to (speed_leg1 + speed_leg2)/2. When are they equal?"
+    - "Under what conditions did the engine call the motion 'uniform'?"
+  scaffolding_level: medium
+
+analysis:
+  guiding_questions:
+    - "State in your own words why the average of two speeds is not the same as the average speed."
+    - "Give a numerical example where they DO happen to be equal, and explain why."
+    - "How could you tell uniform from non-uniform motion using ONLY a distance-time graph?"
+  expected_patterns:
+    - "Students should recover a linear distance-time relationship for uniform motion."
+    - "Students should note average_speed equals mean-of-speeds only when the two leg times are equal."
+    - "Students should distinguish uniform (equal leg speeds) from non-uniform (unequal leg speeds)."
+  scaffolding_level: medium
+
+discussion:
+  discussion_prompts:
+    - "Share one journey you found where the classification surprised you."
+    - "Was your cycling scenario from the provocation uniform, non-uniform, or something else?"
+  peer_interaction_type: "pair-and-share (2 students), then group of 4 to reconcile answers"
+  scaffolding_level: medium
+
+reflection:
+  reflection_prompts:
+    - "What is one thing you now understand about 'average' that you didn't before this lab?"
+    - "Where would this idea (total-divided-by-total, not mean-of-means) show up outside physics?"
+  metacognitive_prompts:
+    - "When did you check your prediction against the engine's number, and what did you change?"
+    - "If a classmate said 'average speed is just (v1 + v2)/2', how would you convince them otherwise using this lab?"
+  scaffolding_level: low
+
+assessment:
+  rubric:
+    - criterion: "Applies distance = speed × time correctly in stated units."
+      levels:
+        - "Cannot apply the formula."
+        - "Applies the formula but drops units or mixes them."
+        - "Applies the formula and carries units through correctly."
+    - criterion: "Distinguishes uniform from non-uniform motion from data."
+      levels:
+        - "Confuses the two."
+        - "Distinguishes them for clear cases."
+        - "Distinguishes them and justifies using leg-speed evidence."
+    - criterion: "Explains why average speed is not (v1 + v2)/2."
+      levels:
+        - "Cannot explain."
+        - "Explains with an example."
+        - "Explains algebraically and gives the condition under which they coincide."
+  formative_checks:
+    - "Predict the average speed BEFORE running the engine on the cycling scenario."
+    - "Sketch a distance-time graph BEFORE plotting the engine's output."
+
+ai_tutor_config:
+  allowed_actions:
+    - hint
+    - rephrase_question
+    - encourage
+    - socratic_prompt
+    - summarize_student_reasoning
+  forbidden_actions:
+    - compute_science
+    - state_scientific_fact
+    - give_final_answer
+  fallback_when_asked_science: >
+    I'm not the source of the physics — the engine in this lab is. Try
+    the calculation there and tell me what you see. I can help you decide
+    which values to try or how to read the result.
