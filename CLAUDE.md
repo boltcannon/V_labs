@@ -49,19 +49,30 @@ Technical reviewer said only "draft is well defined"; detailed comments pending.
 
 * Stack: Next.js (App Router), TypeScript, Zod, YAML specs, Vitest, expr-eval-based expression evaluator. Tutor calls an external LLM (Groq).
 * Baseline: 140 tests passing across 13 files. Baseline commit `0b46d1f`.
-* Specs in `src/specs/`: class-6 biology habitat explorer (categorical, decision tables), class-8 physics pressure (numeric), class-9 physics motion (numeric, multi-run).
+* Specs in `src/specs/` (4): class-6 biology habitat explorer (categorical, decision tables), class-8 physics pressure (numeric), class-9 physics motion (numeric, multi-run), class-10 physics electricity (numeric, schema v2: prediction gate, misconceptions, choice points).
 * `src/schema/lab-spec.ts` is the source of truth; `lab-spec.zod.ts` mirrors it. `NcertClass` currently allows 6–10.
 * `ValidatedLabSpec` is a phantom brand. Only the loader produces it via `asValidatedLabSpec()`. Never weaken this.
-* `PublicLabSpec` redacts rules and decision tables before reaching the client. Rules reach the client only via server-side `runLab()` (verify).
+* `PublicLabSpec` redacts rules and decision tables before reaching the client. Rules reach the client only via server-side `runLab()`.
 * The repo's 9 principles (`src/schema/schema-rationale.md`) are an earlier set and differ from the thesis's current principles. Reconciliation is pending; do not rewrite either without asking.
 * IGNORE the `Claude outputs/` folder (old screenshots and a duplicate YAML).
 * `.env.local` is gitignored. Never print, commit, or copy its contents.
 
 ## 7. Implemented vs designed (be honest in all docs)
 
-Implemented: schema + loader + brand boundary; rule engine (expressions, decision tables, status propagation); tutor with PROMPT-LEVEL rules (3 documented live tests); 9-phase UI shell; authoring wizard; 3 specs.
+Updated 18 Oct 2026, after T1–T6 and the hardening commit (branch `feat/schema-v2`, PR #1).
 
-Designed, NOT implemented: prediction gate; misconception bank and deterministic detectors; discrepant-event checks; typed and fading scaffolds; learner model; inquiry FSM orchestrator; six-check post-hoc response validator; evidence/xAPI logging; offline null-LLM provider (unverified); visual simulation stage.
+Implemented:
+* Schema + loader + brand boundary. The loader runs Zod, then the spec validator (V1–V7); the wizard's save action validates through the same loader.
+* Rule engine (expressions, decision tables, status propagation). `random()` removed from expressions.
+* Schema v2 (all optional): `validity_bounds`, experiment `preset`, `prediction`, `misconceptions` with four-part revision, `choice_points`.
+* Spec validator V1–V8, including seeded V4 robustness sampling and the brightness fixture that fails V4.
+* Prediction gate, choice mode only: matched deterministically on the server at the experiment preset; reveal of prediction vs outcome; explain → compare → revise; teacher's alternative model shown only after a revision attempt. The answer key never reaches the client or the tutor.
+* Misconception bank declared per spec, detected deterministically from the chosen prediction option (`detected_when`). No free-text detectors.
+* Discrepant-event checks at load time (V2–V4).
+* Visual stage: `CircuitStage` for the series circuit, drawn from engine outputs only; slider release runs the engine. Labs map to stages by lab id in code.
+* Tutor with PROMPT-LEVEL rules (3 documented live tests); 9-phase UI shell; authoring wizard (v1 fields only); 4 specs including Class 10 Electricity.
+
+Designed, NOT implemented: typed and fading scaffolds; learner model; inquiry FSM orchestrator; six-check post-hoc response validator; evidence/xAPI logging (prediction and revision answers are not stored); offline null-LLM provider (unverified); choice-point UI; `sort` and `numeric` prediction modes; wizard authoring of v2 fields; stage declared in the spec.
 
 ## 8. Non-negotiable rules
 
@@ -151,12 +162,14 @@ Golden tests (hand-checked; write before the spec):
 
 ### Tasks (stop and report after each)
 
-* T0 Report only, no code changes: baseline test count; whether the expression evaluator supports comparison operators and boolean results; how multi-run experiments are specified; whether rules reach the client only via `runLab()`.
-* T1 Schema v2 types + Zod + tests.
-* T2 Validator V1–V8 with fixtures.
-* T3 `class-10-physics-electricity.yaml` + golden tests.
-* T4 Prediction gate UI (choice mode), reveal of prediction vs outcome, then the revision prompts.
-* T5 Update `docs/principle-mapping.md` (principle → files → tests).
-* T6 `CircuitStage` SVG component. Props = engine outputs only. Battery, two bulbs, two ammeters; glow scales with P, ammeter shows I, flow-dot speed scales with I. Sliders call `runLab()` on release. Test: pass absurd but consistent outputs; the display must show them unchanged.
+Status 18 Oct 2026: T0–T6 done, plus a hardening commit (`random()` removed; loader runs V1–V7). All on `feat/schema-v2`, PR #1.
+
+* [done] T0 Report only, no code changes: baseline test count; whether the expression evaluator supports comparison operators and boolean results; how multi-run experiments are specified; whether rules reach the client only via `runLab()`.
+* [done] T1 Schema v2 types + Zod + tests.
+* [done] T2 Validator V1–V8 with fixtures.
+* [done] T3 `class-10-physics-electricity.yaml` + golden tests.
+* [done] T4 Prediction gate UI (choice mode), reveal of prediction vs outcome, then the revision prompts.
+* [done] T5 Update `docs/principle-mapping.md` (principle → files → tests).
+* [done] T6 `CircuitStage` SVG component. Props = engine outputs only. Battery, two bulbs, two ammeters; glow scales with P, ammeter shows I, flow-dot speed scales with I. Sliders call `runLab()` on release. Test: pass absurd but consistent outputs; the display must show them unchanged.
 
 Out of scope now: typed/fading scaffolds, FSM orchestrator, learner model, six-check validator, xAPI pipeline, AI Author, free-text prediction, offline mode.
