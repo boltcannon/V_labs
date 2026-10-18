@@ -1,14 +1,9 @@
 "use client";
 
 /**
- * Persistent left rail. Shows all 9 phases, their status, and (for
+ * Persistent left rail. Shows all 6 phases, their status, and (for
  * completed phases) the student's response word count. Also renders the
- * overall progress bar — denominator is SUBMITTABLE_PHASES.length (6), not 9,
- * so a Prompt 2 student can reach 100%.
- *
- * Investigation gets a visually distinct state: not "locked" (so the user
- * can visit and see the placeholder), but a muted "simulation coming soon"
- * badge so it's clear the phase is intentionally un-submittable.
+ * overall progress bar.
  */
 
 import Link from "next/link";
@@ -19,13 +14,11 @@ import {
   BookOpenText,
   BarChart3,
   MessagesSquare,
-  ClipboardList,
-  Presentation,
   Compass,
-  ClipboardCheck,
   Lock,
   CircleDot,
   CheckCircle2,
+  Home,
   type LucideIcon,
 } from "lucide-react";
 
@@ -49,29 +42,32 @@ const ICONS: Record<PhaseId, LucideIcon> = {
   investigation: Beaker,
   analysis: BarChart3,
   discussion: MessagesSquare,
-  project_planning: ClipboardList,
-  presentation_review: Presentation,
   reflection: Compass,
-  review_testing: ClipboardCheck,
 };
 
 interface Props {
   labId: string;
+  labTopic?: string;
 }
 
-export function PhaseNavigator({ labId }: Props) {
+export function PhaseNavigator({ labId, labTopic }: Props) {
   const { state } = useLabSession();
   const pathname = usePathname();
   const fraction = progressFraction(state);
 
   return (
     <aside className="w-72 shrink-0 border-r border-surface-border bg-surface flex flex-col">
+      {/* Lab header */}
       <div className="px-5 pt-5 pb-4 border-b border-surface-border">
-        <div className="text-xs uppercase tracking-wider text-text-soft">
-          Lab
-        </div>
-        <div className="mt-1 text-sm font-semibold text-text truncate">
-          {labId}
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-xs text-text-soft hover:text-accent transition-colors mb-3"
+        >
+          <Home className="w-3 h-3" />
+          All labs
+        </Link>
+        <div className="text-sm font-semibold text-text leading-snug">
+          {labTopic ?? labId}
         </div>
         <div className="mt-4 space-y-1.5">
           <div className="flex items-center justify-between text-xs text-text-muted">
@@ -106,8 +102,6 @@ export function PhaseNavigator({ labId }: Props) {
                 return <Badge variant="success" className="gap-1"><CheckCircle2 className="w-3 h-3" />Done</Badge>;
               }
               if (isInvestigation) {
-                // Investigation is Active-but-muted when not completed;
-                // the 'completed' case has already been handled above.
                 return <Badge variant="muted" className="gap-1"><CircleDot className="w-3 h-3" />Active</Badge>;
               }
               if (phase.status === "active") {
@@ -122,16 +116,16 @@ export function PhaseNavigator({ labId }: Props) {
             const inner = (
               <div
                 className={cn(
-                  "flex items-start gap-3 rounded-md px-3 py-2.5 border",
+                  "flex items-start gap-3 rounded-lg px-3 py-2.5 border transition-colors",
                   isActive
-                    ? "bg-accent-muted border-accent/30"
+                    ? "bg-accent-muted border-accent/30 shadow-sm"
                     : "bg-transparent border-transparent hover:bg-surface-muted",
-                  !isClickable && "opacity-70 cursor-not-allowed hover:bg-transparent",
+                  !isClickable && "opacity-60 cursor-not-allowed hover:bg-transparent",
                 )}
               >
                 <div
                   className={cn(
-                    "mt-0.5 shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold",
+                    "mt-0.5 shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold",
                     phase.status === "completed"
                       ? "bg-success-muted text-success"
                       : phase.status === "active" && !isComingSoon
@@ -177,7 +171,7 @@ export function PhaseNavigator({ labId }: Props) {
       </nav>
 
       <div className="px-5 py-3 border-t border-surface-border text-[11px] text-text-soft">
-        v0.2.0 · shell only
+        SAIL v0.3.0
       </div>
     </aside>
   );

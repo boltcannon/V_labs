@@ -1,5 +1,5 @@
 /**
- * Plain constants and types for the 9-phase shell.
+ * Plain constants and types for the 6-phase shell.
  *
  * No "use client" directive, no React imports — safe to import from both
  * server and client components. Anything that touches React (Context,
@@ -12,10 +12,7 @@ export type PhaseId =
   | "investigation"
   | "analysis"
   | "discussion"
-  | "project_planning"
-  | "presentation_review"
-  | "reflection"
-  | "review_testing";
+  | "reflection";
 
 export const PHASE_ORDER: readonly PhaseId[] = [
   "provocation",
@@ -23,10 +20,7 @@ export const PHASE_ORDER: readonly PhaseId[] = [
   "investigation",
   "analysis",
   "discussion",
-  "project_planning",
-  "presentation_review",
   "reflection",
-  "review_testing",
 ] as const;
 
 export const PHASE_LABELS: Record<PhaseId, string> = {
@@ -35,17 +29,12 @@ export const PHASE_LABELS: Record<PhaseId, string> = {
   investigation: "Investigation",
   analysis: "Analysis",
   discussion: "Discussion",
-  project_planning: "Project Planning",
-  presentation_review: "Presentation & Review",
   reflection: "Reflection & Celebration",
-  review_testing: "Review & Testing",
 };
 
 /**
  * Phases the student is expected to submit. Investigation was added in
- * Prompt 3 when the simulation UI made it completable. Denominator = 7.
- * Project Planning and Presentation & Review are still permanently locked
- * (Prompt 5+ scope).
+ * Prompt 3 when the simulation UI made it completable. Denominator = 6.
  */
 export const SUBMITTABLE_PHASES: readonly PhaseId[] = [
   "provocation",
@@ -54,7 +43,6 @@ export const SUBMITTABLE_PHASES: readonly PhaseId[] = [
   "analysis",
   "discussion",
   "reflection",
-  "review_testing",
 ] as const;
 
 /**
@@ -73,14 +61,10 @@ export const UNLOCK_NEXT: Partial<Record<PhaseId, PhaseId>> = {
   investigation: "analysis",
   analysis: "discussion",
   discussion: "reflection",
-  reflection: "review_testing",
 };
 
 /** Phases that are permanently locked until a later prompt. */
-export const COMING_SOON: readonly PhaseId[] = [
-  "project_planning",
-  "presentation_review",
-];
+export const COMING_SOON: readonly PhaseId[] = [];
 
 export type PhaseStatus = "locked" | "active" | "completed";
 

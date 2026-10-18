@@ -42,6 +42,12 @@ export function defaultValue(v: Variable): Scalar {
   return 0;
 }
 
+/** Keys that change a range input's value. */
+export const SLIDER_KEYS: ReadonlySet<string> = new Set([
+  "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+  "Home", "End", "PageUp", "PageDown",
+]);
+
 function sliderStep(min: number, max: number): number {
   const span = max - min;
   if (span <= 20) return 1;
@@ -83,6 +89,11 @@ function NumberControl({
   // a pending state update from the last onChange.
   const commitSlider = (e: { currentTarget: HTMLInputElement }) =>
     onCommit?.(Number(e.currentTarget.value));
+  // Only keys that move the slider count as a release. Otherwise e.g. the
+  // keyup of the Tab that moved focus here would commit a stale value.
+  const commitSliderKey = (e: { key: string; currentTarget: HTMLInputElement }) => {
+    if (SLIDER_KEYS.has(e.key)) commitSlider(e);
+  };
 
   return (
     <div className="space-y-1.5">
@@ -114,7 +125,7 @@ function NumberControl({
         disabled={disabled ?? false}
         onChange={(e) => onChange(Number(e.target.value))}
         onPointerUp={commitSlider}
-        onKeyUp={commitSlider}
+        onKeyUp={commitSliderKey}
         className="w-full accent-accent"
         aria-label={variable.label}
       />

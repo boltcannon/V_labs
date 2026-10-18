@@ -34,6 +34,12 @@ export interface ExperimentRun {
   outputs: Record<string, RunOutput>;
   /** Set when the Server Action returned an error string. */
   error?: string;
+  /**
+   * The value the student said they expected for one output before this
+   * run, if they gave one. Ungraded — only drawn as a "ghost" on the graph
+   * next to the engine's real value.
+   */
+  expectation?: { y_variable: string; value: number };
 }
 
 export interface InvestigationSummary {

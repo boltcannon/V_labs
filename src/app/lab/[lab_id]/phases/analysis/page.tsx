@@ -11,23 +11,25 @@ interface Props {
 export default function AnalysisPage({ params }: Props) {
   const spec = getLabSpec(params.lab_id);
   return (
-    <>
-      <PhaseCard
-        phaseId="analysis"
-        phaseIndex={3}
-        scaffolding={spec.analysis.scaffolding_level}
-        subtitle="Make sense of what you found."
-      >
-        <AnalysisContent analysis={spec.analysis} />
-        <hr className="border-surface-border" />
-        <PromptAndResponse
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-6 py-8">
+        <PhaseCard
           phaseId="analysis"
-          labId={params.lab_id}
-          prompt="Answer the guiding questions above using evidence from your experiments."
-          placeholder="Point to specific runs from the Investigation phase where you can."
-        />
-      </PhaseCard>
-      <TutorPanel labId={params.lab_id} currentPhase="analysis" />
-    </>
+          phaseIndex={3}
+          scaffolding={spec.analysis.scaffolding_level}
+          subtitle="Make sense of what you found."
+        >
+          <AnalysisContent analysis={spec.analysis} />
+          <hr className="border-surface-border" />
+          <PromptAndResponse
+            phaseId="analysis"
+            labId={params.lab_id}
+            prompt="Answer the guiding questions above using evidence from your experiments."
+            placeholder="Point to specific runs from the Investigation phase where you can."
+          />
+        </PhaseCard>
+        <TutorPanel labId={params.lab_id} currentPhase="analysis" />
+      </div>
+    </div>
   );
 }

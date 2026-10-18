@@ -1,37 +1,41 @@
 "use client";
 
 /**
- * The Investigation phase's live UI (Prompt 3 Checkpoint 3 — full).
+ * Investigation phase — sim-first layout.
  *
- * State:
- *   - activeTab: string
- *   - varValues: Record<varId, Scalar>   — sticky across tabs
- *   - runs: ExperimentRun[]              — appended per Run click
- *   - historyFilter: "all" | tab id      — filter for the history table
- *   - constantsOpen: boolean             — Set-constants collapse (per-tab)
- *   - pending: boolean                   — Server Action in flight
- *   - lastError: string | null
- *
- * Flow:
- *   1. Assemble `inputs` from `varValues` — only vars this tab exposes
- *      (controlled + manipulated).
- *   2. Await `runExperiment(...)` — server calls `runLab` against its
- *      own `ValidatedLabSpec`.
- *   3. Append an `ExperimentRun` to `runs`.
- *   4. Results panel derives from the last matching run in `runs` for
- *      the current tab.
- *   5. Data-history table renders all runs (filterable).
- *   6. "I'm done exploring" button enabled once runs.length >= 1;
- *      writes a JSON `InvestigationSummary` into
- *      `LabSessionState.phases.investigation.student_response`, marks
- *      the phase completed, unlocks Analysis via `UNLOCK_NEXT`.
+ * Layout:
+ *   ┌─────────────────────────────────────────────┐
+ *   │ Toolbar: experiment tabs + run count + done  │
+ *   ├────────────────────────┬────────────────────┤
+ *   │                        │  Controls panel     │
+ *   │   Simulation stage     │  - Prediction gate  │
+ *   │   (circuit / generic)  │  - Sliders          │
+ *   │                        │  - Constants        │
+ *   │                        │  - Quick results    │
+ *   ├────────────────────────┴────────────────────┤
+ *   │ Data drawer (collapsible)                    │
+ *   │  Graph · Results table · Run history         │
+ *   └─────────────────────────────────────────────┘
  */
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Play, Beaker, Compass, Settings2, ChevronDown, ChevronRight, ArrowRight, CheckCircle2, Lock } from "lucide-react";
+import {
+  Play,
+  Beaker,
+  Compass,
+  Settings2,
+  ChevronDown,
+  ChevronUp,
+  ChevronRight,
+  ArrowRight,
+  CheckCircle2,
+  Lock,
+  BarChart3,
+  Table2,
+} from "lucide-react";
 
-import type { Investigation, PublicPrediction, Variable } from "@/schema/lab-spec";
+import type { Investigation, PublicPrediction, Variable, ScaffoldingLevel } from "@/schema/lab-spec";
 import type { Scalar } from "@/engine/types";
 import {
   FREE_EXPLORATION_ID,
@@ -60,6 +64,14 @@ import { cn } from "@/lib/cn";
 import { VariableControl, VariableReadonly, defaultValue } from "./variable-control";
 import { ResultsPanel } from "./results-panel";
 import { RunHistoryTable } from "./run-history-table";
+import { RunGraph } from "./run-graph";
+import {
+  defaultAxes,
+  graphPoints,
+  numericInputs,
+  numericOutputs,
+  type AxisChoice,
+} from "./run-graph-data";
 import { PredictionPanel } from "./prediction-panel";
 import { CircuitStage } from "@/components/stage/circuit-stage";
 import { circuitStagePropsFromRun } from "@/components/stage/circuit-stage-adapter";
@@ -69,14 +81,9 @@ interface Props {
   labId: string;
   investigation: Investigation;
   variables: Variable[];
-  /** Schema v2, redacted (no answer key). Absent for v1 labs. */
   prediction?: PublicPrediction | undefined;
-  /**
-   * Live visual stage for this lab, if any. When set, settling a control
-   * runs the engine (via the runExperiment Server Action) and the stage
-   * redraws from the run's outputs.
-   */
   stage?: StageKind | undefined;
+  scaffoldingLevel?: ScaffoldingLevel;
 }
 
 interface TabSpec {
@@ -88,7 +95,9 @@ interface TabSpec {
   measured: string[];
 }
 
-export function InvestigationShell({ labId, investigation, variables, prediction, stage }: Props) {
+type DrawerTab = "graph" | "results" | "history";
+
+export function InvestigationShell({ labId, investigation, variables, prediction, stage, scaffoldingLevel }: Props) {
   const varsById = useMemo(
     () => new Map(variables.map((v) => [v.id, v])),
     [variables],
@@ -117,10 +126,10 @@ export function InvestigationShell({ labId, investigation, variables, prediction
 
   const [activeTab, setActiveTab] = useState<string>(tabs[0]!.id);
   const [constantsOpen, setConstantsOpen] = useState<boolean>(false);
+  const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
+  const [drawerTab, setDrawerTab] = useState<DrawerTab>("graph");
 
   /* ---- Prediction gate (schema v2) ---- */
-  // Only a gated prediction locks runs. Items are matched to tabs by
-  // experiment id; the answer key never reaches this component.
   const gate = prediction?.gate === true;
   const itemForTab = useCallback(
     (tabId: string) =>
@@ -142,8 +151,6 @@ export function InvestigationShell({ labId, investigation, variables, prediction
     }));
   }, []);
 
-  // Sticky variable values across tabs. A gated first tab starts at its
-  // preset, so the controls show the configuration being predicted about.
   const [varValues, setVarValues] = useState<Record<string, Scalar>>(() => {
     const seed: Record<string, Scalar> = {};
     for (const id of investigation.explorable_variables) {
@@ -159,6 +166,8 @@ export function InvestigationShell({ labId, investigation, variables, prediction
 
   const [runs, setRuns] = useState<ExperimentRun[]>([]);
   const [historyFilter, setHistoryFilter] = useState<string>("all");
+  const [axesByTab, setAxesByTab] = useState<Record<string, AxisChoice>>({});
+  const [expectationDraft, setExpectationDraft] = useState<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
   const [lastError, setLastError] = useState<string | null>(null);
 
@@ -181,10 +190,6 @@ export function InvestigationShell({ labId, investigation, variables, prediction
     return null;
   }, [runs, currentTab.id]);
 
-  /**
-   * `overrides` carries a value that has just settled (slider release) so
-   * the run uses it even if the matching state update hasn't rendered yet.
-   */
   const runNow = useCallback((overrides: Record<string, Scalar> = {}) => {
     const varsExposed = new Set([
       ...currentTab.controlled,
@@ -194,6 +199,18 @@ export function InvestigationShell({ labId, investigation, variables, prediction
     const inputs: Record<string, Scalar> = {};
     for (const id of varsExposed) {
       if (id in values) inputs[id] = values[id]!;
+    }
+    const tabAxes =
+      axesByTab[currentTab.id] ??
+      defaultAxes(currentTab, variables, investigation.explorable_variables);
+    const draft = expectationDraft[currentTab.id]?.trim() ?? "";
+    const expectedValue = draft === "" ? NaN : Number(draft);
+    const expectation =
+      tabAxes && Number.isFinite(expectedValue)
+        ? { y_variable: tabAxes.y, value: expectedValue }
+        : undefined;
+    if (expectation) {
+      setExpectationDraft((prev) => ({ ...prev, [currentTab.id]: "" }));
     }
     startTransition(async () => {
       const out = await runExperiment({
@@ -215,11 +232,13 @@ export function InvestigationShell({ labId, investigation, variables, prediction
         inputs,
         outputs,
         ...(out.error ? { error: out.error } : {}),
+        ...(expectation ? { expectation } : {}),
       };
       setRuns((prev) => [...prev, run]);
       setLastError(out.error ?? null);
+      if (!drawerOpen && runs.length === 0) setDrawerOpen(true);
     });
-  }, [currentTab, varValues, labId]);
+  }, [currentTab, varValues, labId, axesByTab, expectationDraft, variables, investigation, drawerOpen, runs.length]);
 
   const clearHistory = useCallback(() => {
     setRuns([]);
@@ -253,16 +272,21 @@ export function InvestigationShell({ labId, investigation, variables, prediction
     : undefined;
   const allPredictionsDone =
     !gate || prediction!.items.every((i) => isRunUnlocked(predictions[i.id]));
-  // Free exploration would show every output, so it opens only once every
-  // gated prediction has been committed and revised.
   const freeLocked = currentTab.id === FREE_EXPLORATION_ID && !allPredictionsDone;
   const tabLocked = currentItem !== undefined && !isRunUnlocked(currentPrediction);
   const runLocked = tabLocked || freeLocked;
-  // With a live stage, releasing a slider runs the engine — unless the
-  // prediction gate still holds this tab.
-  const autoRun = stage !== undefined && !runLocked;
-  // The stage draws the latest run, but stays idle on a locked tab so it
-  // can't show a reading before the student has predicted it.
+  const autoRun = !runLocked;
+
+  /* ---- Live run graph ---- */
+  const tabDefaultAxes = defaultAxes(currentTab, variables, investigation.explorable_variables);
+  const axes = axesByTab[currentTab.id] ?? tabDefaultAxes;
+  const xVar = axes ? varsById.get(axes.x) : undefined;
+  const yVar = axes ? varsById.get(axes.y) : undefined;
+  const points = axes ? graphPoints(runs, currentTab.id, axes.x, axes.y) : [];
+  const setAxis = (which: "x" | "y", id: string) => {
+    if (!axes) return;
+    setAxesByTab((prev) => ({ ...prev, [currentTab.id]: { ...axes, [which]: id } }));
+  };
   const stageOutputs = runLocked ? null : runs[runs.length - 1]?.outputs ?? null;
 
   const commitPrediction = useCallback(() => {
@@ -278,8 +302,6 @@ export function InvestigationShell({ labId, investigation, variables, prediction
         return;
       }
       dispatchPrediction(itemId, { type: "resolved", resolution: r.resolution });
-      // The resolving run is a real engine run: record it in the history
-      // and move the controls to the preset it ran at.
       setRuns((prev) => [
         ...prev,
         {
@@ -292,6 +314,7 @@ export function InvestigationShell({ labId, investigation, variables, prediction
       ]);
       setVarValues((prev) => ({ ...prev, ...r.resolution.inputs }));
       setLastError(null);
+      setDrawerOpen(true);
     });
   }, [currentItem, currentPrediction, labId, dispatchPrediction]);
 
@@ -321,154 +344,185 @@ export function InvestigationShell({ labId, investigation, variables, prediction
   );
 
   const canFinish = runs.length >= 1 && allPredictionsDone;
+  const tabRunCount = runs.filter((r) => r.experiment_id === currentTab.id).length;
 
   return (
-    <div className="space-y-5">
-      {/* Tab list */}
-      <div
-        role="tablist"
-        aria-label="Experiments"
-        className="flex flex-wrap items-center gap-1.5 border-b border-surface-border pb-2"
-      >
-        {tabs.map((t) => {
-          const isFree = t.id === FREE_EXPLORATION_ID;
-          const selected = t.id === activeTab;
-          const Icon = isFree ? Compass : Beaker;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => {
-                setActiveTab(t.id);
-                setLastError(null);
-                setPredError(null);
-                setConstantsOpen(false);
-                // A still-locked gated tab shows its preset — the
-                // configuration the prediction is about.
-                const item = itemForTab(t.id);
-                const preset = presetFor(t.id);
-                if (item && preset && !isRunUnlocked(predictions[item.id])) {
-                  setVarValues((prev) => ({ ...prev, ...preset }));
-                }
-              }}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium border transition",
-                selected
-                  ? "bg-accent text-text-inverse border-accent"
-                  : "bg-surface text-text border-surface-border hover:bg-surface-muted",
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {currentTab.goal && (
-        <div className="rounded-md border border-surface-border bg-surface-muted px-4 py-3">
-          <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-            Goal
-          </div>
-          <p className="mt-1 text-sm text-text">{currentTab.goal}</p>
-        </div>
-      )}
-
-      {/* Prediction gate (schema v2) */}
-      {currentItem && currentPrediction && (
-        <PredictionPanel
-          item={currentItem}
-          state={currentPrediction}
-          variables={variables}
-          measured={currentTab.measured}
-          pending={predPending}
-          error={predError}
-          onSelect={(optionId) =>
-            dispatchPrediction(currentItem.id, { type: "select", option_id: optionId })
-          }
-          onCommit={commitPrediction}
-          onAnswer={answerRevision}
-        />
-      )}
-      {freeLocked && (
-        <div className="flex items-start gap-2 rounded-md border border-surface-border bg-surface-muted px-4 py-3 text-sm text-text-muted">
-          <Lock className="w-4 h-4 mt-0.5 shrink-0" />
-          Free exploration opens once you have made and checked a prediction in each experiment tab.
-        </div>
-      )}
-
-      {/* Live stage — draws engine outputs only */}
-      {stage === "series_circuit" && (
-        <div className="space-y-1.5">
-          <CircuitStage {...circuitStagePropsFromRun(stageOutputs, variables)} />
-          <p className="text-xs text-text-soft">
-            {runLocked
-              ? "The circuit lights up once you have made your prediction."
-              : "Release a slider to run the circuit. Every reading comes from the lab's engine."}
-          </p>
-        </div>
-      )}
-
-      {/* Controls area */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
-            {currentTab.id === FREE_EXPLORATION_ID
-              ? "All variables"
-              : "Change these"}
-          </div>
-          <div className="space-y-4">
-            {currentTab.manipulated.map((id) => {
-              const v = varsById.get(id);
-              if (!v) return null;
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* ═══════ Toolbar ═══════ */}
+      <div className="shrink-0 bg-surface border-b border-surface-border px-4 py-2.5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <div
+            role="tablist"
+            aria-label="Experiments"
+            className="flex items-center gap-1.5"
+          >
+            {tabs.map((t) => {
+              const isFree = t.id === FREE_EXPLORATION_ID;
+              const selected = t.id === activeTab;
+              const Icon = isFree ? Compass : Beaker;
               return (
-                <VariableControl
-                  key={id}
-                  variable={v}
-                  value={varValues[id]}
-                  onChange={(nv) => setValue(id, nv)}
-                  onCommit={autoRun ? (nv) => runNow({ [id]: nv }) : undefined}
-                  disabled={pending || runLocked}
-                />
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => {
+                    setActiveTab(t.id);
+                    setLastError(null);
+                    setPredError(null);
+                    setConstantsOpen(false);
+                    const item = itemForTab(t.id);
+                    const preset = presetFor(t.id);
+                    if (item && preset && !isRunUnlocked(predictions[item.id])) {
+                      setVarValues((prev) => ({ ...prev, ...preset }));
+                    }
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border transition whitespace-nowrap",
+                    selected
+                      ? "bg-accent text-text-inverse border-accent"
+                      : "bg-surface text-text border-surface-border hover:bg-surface-muted",
+                  )}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {t.label}
+                </button>
               );
             })}
           </div>
+          {runs.length > 0 && (
+            <span className="text-xs text-text-soft whitespace-nowrap ml-2">
+              {runs.length} run{runs.length === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setDrawerOpen((v) => !v)}
+            className="text-xs gap-1.5"
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            Data
+            {drawerOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+          </Button>
+          <Button
+            size="sm"
+            onClick={doneExploring}
+            disabled={!canFinish || pending}
+            data-testid="done-exploring"
+            className="text-xs"
+          >
+            {investigationCompleted ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Re-submit
+              </>
+            ) : (
+              <>
+                Done exploring
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* ═══════ Main area: simulation + controls ═══════ */}
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto">
+        {/* ── Simulation canvas ── */}
+        <div className="flex-1 min-w-0 p-4 flex flex-col">
+          {/* Goal banner */}
+          {currentTab.goal && (
+            <div className="rounded-lg border border-surface-border bg-surface px-4 py-2.5 mb-3">
+              <p className="text-sm text-text">
+                <span className="font-semibold text-accent-strong">Goal: </span>
+                {currentTab.goal}
+              </p>
+            </div>
+          )}
+
+          {/* Prediction gate */}
+          {currentItem && currentPrediction && (
+            <div className="mb-3">
+              <PredictionPanel
+                item={currentItem}
+                state={currentPrediction}
+                variables={variables}
+                measured={currentTab.measured}
+                pending={predPending}
+                error={predError}
+                onSelect={(optionId) =>
+                  dispatchPrediction(currentItem.id, { type: "select", option_id: optionId })
+                }
+                onCommit={commitPrediction}
+                onAnswer={answerRevision}
+              />
+            </div>
+          )}
+          {freeLocked && (
+            <div className="flex items-start gap-2 rounded-lg border border-surface-border bg-surface-muted px-4 py-3 text-sm text-text-muted mb-3">
+              <Lock className="w-4 h-4 mt-0.5 shrink-0" />
+              Free exploration opens once you have made and checked a prediction in each experiment tab.
+            </div>
+          )}
+
+          {/* Stage visual — takes remaining space */}
+          {stage === "series_circuit" ? (
+            <div className="flex-1 flex items-center justify-center min-h-[280px]">
+              <div className="w-full max-w-2xl">
+                <CircuitStage {...circuitStagePropsFromRun(stageOutputs, variables)} />
+                <p className="text-xs text-text-soft text-center mt-2">
+                  {runLocked
+                    ? "The circuit lights up once you have made your prediction."
+                    : "Drag a slider to run the circuit. Every reading comes from the engine."}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center min-h-[200px] rounded-lg border-2 border-dashed border-surface-border">
+              <div className="text-center text-text-soft">
+                <Beaker className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">
+                  {runLocked ? "Make your prediction to start." : "Change a value to run the experiment."}
+                </p>
+                {!runLocked && (
+                  <Button
+                    onClick={() => runNow()}
+                    disabled={pending}
+                    className="mt-3"
+                    size="sm"
+                  >
+                    <Play className="w-4 h-4" />
+                    Run experiment
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        {currentTab.controlled.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-                Held constant
+        {/* ── Controls panel (right sidebar) ── */}
+        <div className="md:w-72 xl:w-80 shrink-0 border-t md:border-t-0 md:border-l border-surface-border bg-surface overflow-y-auto">
+          <div className="p-4 space-y-4">
+            {/* Scaffolding badge */}
+            {scaffoldingLevel && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Controls</span>
+                <Badge variant="muted" className="text-[10px]">
+                  {scaffoldingLevel} support
+                </Badge>
               </div>
-              <button
-                type="button"
-                onClick={() => setConstantsOpen((v) => !v)}
-                disabled={pending || runLocked}
-                className={cn(
-                  "inline-flex items-center gap-1 text-xs text-accent-strong hover:text-accent transition",
-                  (pending || runLocked) && "opacity-50 cursor-not-allowed",
-                )}
-                aria-expanded={constantsOpen}
-              >
-                <Settings2 className="w-3.5 h-3.5" />
-                {constantsOpen ? "Done" : "Set constants"}
-                {constantsOpen ? (
-                  <ChevronDown className="w-3.5 h-3.5" />
-                ) : (
-                  <ChevronRight className="w-3.5 h-3.5" />
-                )}
-              </button>
-            </div>
-            {constantsOpen ? (
-              <div className="space-y-4 rounded-md border border-accent/30 bg-accent-muted/40 p-3">
-                <p className="text-xs text-text-muted">
-                  These values are held constant while you run this experiment.
-                  Set them once — they persist across tabs.
-                </p>
-                {currentTab.controlled.map((id) => {
+            )}
+
+            {/* Manipulated variables */}
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
+                {currentTab.id === FREE_EXPLORATION_ID ? "All variables" : "Change these"}
+              </div>
+              <div className="space-y-3">
+                {currentTab.manipulated.map((id) => {
                   const v = varsById.get(id);
                   if (!v) return null;
                   return (
@@ -478,111 +532,217 @@ export function InvestigationShell({ labId, investigation, variables, prediction
                       value={varValues[id]}
                       onChange={(nv) => setValue(id, nv)}
                       onCommit={autoRun ? (nv) => runNow({ [id]: nv }) : undefined}
-                      disabled={pending || runLocked}
+                      disabled={runLocked}
                     />
                   );
                 })}
               </div>
-            ) : (
-              <div className="space-y-2">
-                {currentTab.controlled.map((id) => {
-                  const v = varsById.get(id);
-                  if (!v) return null;
-                  return (
-                    <VariableReadonly
-                      key={id}
-                      variable={v}
-                      value={varValues[id]}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Run button + counts */}
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-text-soft">
-          {runs.length === 0 ? (
-            "No runs yet"
-          ) : (
-            <>
-              {runs.length} run{runs.length === 1 ? "" : "s"} recorded
-              <Badge variant="muted" className="ml-2">
-                this tab: {runs.filter((r) => r.experiment_id === currentTab.id).length}
-              </Badge>
-            </>
-          )}
-        </div>
-        <Button onClick={() => runNow()} disabled={pending || runLocked}>
-          {runLocked ? <Lock className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-          {pending ? "Running…" : runLocked ? "Predict first" : "Run experiment"}
-        </Button>
-      </div>
-
-      {/* Results */}
-      <div>
-        <div className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
-          Results — most recent {currentTab.label} run
-        </div>
-        <ResultsPanel
-          variables={variables}
-          varsToShow={currentTab.measured}
-          outputs={lastRunForTab?.outputs ?? null}
-          error={lastError}
-        />
-      </div>
-
-      {/* History */}
-      <RunHistoryTable
-        runs={runs}
-        inputVars={inputVars}
-        outputVars={outputVars}
-        experiments={experimentsForFilter}
-        filter={historyFilter}
-        onFilterChange={setHistoryFilter}
-        onClear={clearHistory}
-        disabled={pending}
-      />
-
-      {/* Done bar */}
-      <div className="mt-6 rounded-lg border border-surface-border bg-surface p-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-text">
-              {investigationCompleted ? "Already submitted" : "Finished exploring?"}
             </div>
-            <p className="mt-0.5 text-xs text-text-muted">
-              {investigationCompleted
-                ? "You've submitted your data history for this lab. Re-submitting will overwrite it with the current runs."
-                : canFinish
-                  ? `You've recorded ${runs.length} run${runs.length === 1 ? "" : "s"}. When you're done, submit to unlock Analysis.`
-                  : !allPredictionsDone
-                    ? "Make and check a prediction in each experiment tab before finishing."
-                    : "Run at least one experiment before finishing."}
-            </p>
-          </div>
-          <Button
-            onClick={doneExploring}
-            disabled={!canFinish || pending}
-            data-testid="done-exploring"
-          >
-            {investigationCompleted ? (
-              <>
-                <CheckCircle2 className="w-4 h-4" />
-                Re-submit
-              </>
-            ) : (
-              <>
-                I'm done exploring
-                <ArrowRight className="w-4 h-4" />
-              </>
+
+            {/* Controlled variables */}
+            {currentTab.controlled.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+                    Held constant
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConstantsOpen((v) => !v)}
+                    disabled={runLocked}
+                    className={cn(
+                      "inline-flex items-center gap-1 text-xs text-accent-strong hover:text-accent transition",
+                      runLocked && "opacity-50 cursor-not-allowed",
+                    )}
+                    aria-expanded={constantsOpen}
+                  >
+                    <Settings2 className="w-3.5 h-3.5" />
+                    {constantsOpen ? "Done" : "Edit"}
+                    {constantsOpen ? (
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+                {constantsOpen ? (
+                  <div className="space-y-3 rounded-lg border border-accent/30 bg-accent-muted/40 p-3">
+                    {currentTab.controlled.map((id) => {
+                      const v = varsById.get(id);
+                      if (!v) return null;
+                      return (
+                        <VariableControl
+                          key={id}
+                          variable={v}
+                          value={varValues[id]}
+                          onChange={(nv) => setValue(id, nv)}
+                          onCommit={autoRun ? (nv) => runNow({ [id]: nv }) : undefined}
+                          disabled={runLocked}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {currentTab.controlled.map((id) => {
+                      const v = varsById.get(id);
+                      if (!v) return null;
+                      return (
+                        <VariableReadonly
+                          key={id}
+                          variable={v}
+                          value={varValues[id]}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
-          </Button>
+
+            {/* Run button */}
+            <div className="pt-2 border-t border-surface-border">
+              <Button
+                onClick={() => runNow()}
+                disabled={pending || runLocked}
+                className="w-full"
+                size="sm"
+              >
+                {runLocked ? <Lock className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                {pending ? "Running…" : runLocked ? "Predict first" : "Run experiment"}
+              </Button>
+              <p className="text-[11px] text-text-soft text-center mt-1.5">
+                {runs.length === 0
+                  ? runLocked ? "" : "or drag a slider"
+                  : `${tabRunCount} run${tabRunCount === 1 ? "" : "s"} this experiment`}
+              </p>
+            </div>
+
+            {/* Quick results — latest run for this tab */}
+            {lastRunForTab && (
+              <div className="pt-2 border-t border-surface-border">
+                <div className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
+                  Latest reading
+                </div>
+                <ResultsPanel
+                  variables={variables}
+                  varsToShow={currentTab.measured}
+                  outputs={lastRunForTab.outputs}
+                  error={lastError}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* ═══════ Data drawer (collapsible) ═══════ */}
+      {drawerOpen && (
+        <div className="shrink-0 border-t border-surface-border bg-surface">
+          {/* Drawer tab bar */}
+          <div className="flex items-center gap-1 px-4 pt-2 border-b border-surface-border">
+            {([
+              { id: "graph" as const, label: "Graph", Icon: BarChart3 },
+              { id: "results" as const, label: "Results table", Icon: Table2 },
+              { id: "history" as const, label: "Run history", Icon: Table2 },
+            ]).map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setDrawerTab(id)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition -mb-px",
+                  drawerTab === id
+                    ? "border-accent text-accent"
+                    : "border-transparent text-text-muted hover:text-text",
+                )}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-4 max-h-[40vh] overflow-y-auto">
+            {drawerTab === "graph" && axes && xVar && yVar && (
+              <div className="space-y-2 max-w-3xl">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
+                  <label className="flex items-center gap-1">
+                    y
+                    <select
+                      aria-label="Graph y-axis"
+                      value={axes.y}
+                      onChange={(e) => setAxis("y", e.target.value)}
+                      className="rounded-md border border-surface-border bg-surface px-2 py-1 text-xs"
+                    >
+                      {numericOutputs(variables).map((v) => (
+                        <option key={v.id} value={v.id}>{v.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-1">
+                    x
+                    <select
+                      aria-label="Graph x-axis"
+                      value={axes.x}
+                      onChange={(e) => setAxis("x", e.target.value)}
+                      className="rounded-md border border-surface-border bg-surface px-2 py-1 text-xs"
+                    >
+                      {numericInputs(variables, investigation.explorable_variables).map((v) => (
+                        <option key={v.id} value={v.id}>{v.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                {!runLocked && (
+                  <label className="flex flex-wrap items-center gap-2 rounded-md border border-surface-border bg-surface-muted px-3 py-2 text-xs text-text-muted">
+                    <span>I expect {yVar.label} ≈</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      aria-label={`Expected ${yVar.label} for the next run`}
+                      value={expectationDraft[currentTab.id] ?? ""}
+                      onChange={(e) =>
+                        setExpectationDraft((prev) => ({ ...prev, [currentTab.id]: e.target.value }))
+                      }
+                      className="w-24 rounded-md border border-surface-border bg-surface px-2 py-1 text-xs text-right"
+                    />
+                    {yVar.unit && <span>{yVar.unit}</span>}
+                  </label>
+                )}
+                <RunGraph points={points} xVar={xVar} yVar={yVar} latestRunId={runs[runs.length - 1]?.id} />
+              </div>
+            )}
+            {drawerTab === "graph" && !(axes && xVar && yVar) && (
+              <p className="text-sm text-text-muted">Run an experiment to see the graph.</p>
+            )}
+
+            {drawerTab === "results" && (
+              <div className="max-w-3xl">
+                <ResultsPanel
+                  variables={variables}
+                  varsToShow={currentTab.measured}
+                  outputs={lastRunForTab?.outputs ?? null}
+                  error={lastError}
+                />
+              </div>
+            )}
+
+            {drawerTab === "history" && (
+              <RunHistoryTable
+                runs={runs}
+                inputVars={inputVars}
+                outputVars={outputVars}
+                experiments={experimentsForFilter}
+                filter={historyFilter}
+                onFilterChange={setHistoryFilter}
+                onClear={clearHistory}
+                disabled={pending}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
