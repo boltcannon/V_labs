@@ -13,3 +13,4 @@ export function loadSpec(rel: string): ValidatedLabSpec {
 export const CLASS_6_PATH = "src/specs/class-6-biology-habitat-explorer.yaml";
 export const CLASS_8_PATH = "src/specs/class-8-physics-pressure.yaml";
 export const CLASS_9_PATH = "src/specs/class-9-physics-motion.yaml";
+export const CLASS_10_PATH = "src/specs/class-10-physics-electricity.yaml";

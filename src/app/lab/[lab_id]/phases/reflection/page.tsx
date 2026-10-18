@@ -11,23 +11,25 @@ interface Props {
 export default function ReflectionPage({ params }: Props) {
   const spec = getLabSpec(params.lab_id);
   return (
-    <>
-      <PhaseCard
-        phaseId="reflection"
-        phaseIndex={7}
-        scaffolding={spec.reflection.scaffolding_level}
-        subtitle="Step back and look at how you learned."
-      >
-        <ReflectionContent reflection={spec.reflection} />
-        <hr className="border-surface-border" />
-        <PromptAndResponse
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-6 py-8">
+        <PhaseCard
           phaseId="reflection"
-          labId={params.lab_id}
-          prompt="Write your reflection."
-          placeholder="Where did your thinking change? What would you do differently?"
-        />
-      </PhaseCard>
-      <TutorPanel labId={params.lab_id} currentPhase="reflection" />
-    </>
+          phaseIndex={5}
+          scaffolding={spec.reflection.scaffolding_level}
+          subtitle="Step back and look at how you learned."
+        >
+          <ReflectionContent reflection={spec.reflection} />
+          <hr className="border-surface-border" />
+          <PromptAndResponse
+            phaseId="reflection"
+            labId={params.lab_id}
+            prompt="Write your reflection."
+            placeholder="Where did your thinking change? What would you do differently?"
+          />
+        </PhaseCard>
+        <TutorPanel labId={params.lab_id} currentPhase="reflection" />
+      </div>
+    </div>
   );
 }

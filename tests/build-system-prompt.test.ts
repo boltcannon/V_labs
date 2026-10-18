@@ -7,7 +7,7 @@ import {
 import type { ChatWithTutorInput } from "../src/app/lib/tutor-types";
 import type { InvestigationSummary } from "../src/app/lib/experiment-run";
 import type { PhaseId } from "../src/app/lib/session-shared";
-import { loadSpec, CLASS_6_PATH, CLASS_9_PATH } from "./helpers";
+import { loadSpec, CLASS_6_PATH, CLASS_9_PATH, CLASS_10_PATH } from "./helpers";
 
 /**
  * These tests are the architectural enforcement of Principle 8. If they
@@ -31,6 +31,7 @@ function baseInput(phase: PhaseId): ChatWithTutorInput {
 const SPECS = [
   { name: "class-9", path: CLASS_9_PATH },
   { name: "class-6", path: CLASS_6_PATH },
+  { name: "class-10", path: CLASS_10_PATH },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -44,8 +45,7 @@ for (const { name, path } of SPECS) {
     it("system prompt never contains any rule's `expression` string, on any phase", () => {
       const phases: PhaseId[] = [
         "provocation", "ncl", "investigation", "analysis",
-        "discussion", "reflection", "review_testing",
-        "project_planning", "presentation_review",
+        "discussion", "reflection",
       ];
       const rulesWithExpressions = spec.science_model.rules.filter(
         (r) => typeof r.expression === "string" && r.expression.length > 0,
@@ -67,7 +67,7 @@ for (const { name, path } of SPECS) {
       // times time") — including one is tantamount to stating the formula.
       const phases: PhaseId[] = [
         "provocation", "ncl", "investigation", "analysis",
-        "discussion", "reflection", "review_testing",
+        "discussion", "reflection",
       ];
       for (const phase of phases) {
         const prompt = buildSystemPrompt(spec, baseInput(phase));
@@ -87,7 +87,7 @@ for (const { name, path } of SPECS) {
       // its `then` value alone.
       const phases: PhaseId[] = [
         "provocation", "ncl", "investigation", "analysis",
-        "discussion", "reflection", "review_testing",
+        "discussion", "reflection",
       ];
       const tables = spec.science_model.decision_tables ?? [];
       for (const phase of phases) {
@@ -192,17 +192,6 @@ describe("build-system-prompt / phase scoping", () => {
     expect(prompt).toContain("do not reveal");
   });
 
-  it("Review & Testing phase includes rubric criterion names but NOT level strings", () => {
-    const prompt = buildSystemPrompt(spec, baseInput("review_testing"));
-    for (const row of spec.assessment.rubric) {
-      expect(prompt).toContain(row.criterion);
-      // Level strings carry judgment prose ("Confuses the two", etc.) — the
-      // tutor could parrot these as truth.
-      for (const level of row.levels) {
-        expect(prompt).not.toContain(level);
-      }
-    }
-  });
 });
 
 /* ------------------------------------------------------------------ */

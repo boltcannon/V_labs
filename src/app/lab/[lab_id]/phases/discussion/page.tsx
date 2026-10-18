@@ -11,23 +11,25 @@ interface Props {
 export default function DiscussionPage({ params }: Props) {
   const spec = getLabSpec(params.lab_id);
   return (
-    <>
-      <PhaseCard
-        phaseId="discussion"
-        phaseIndex={4}
-        scaffolding={spec.discussion.scaffolding_level}
-        subtitle="Compare your findings with others."
-      >
-        <DiscussionContent discussion={spec.discussion} />
-        <hr className="border-surface-border" />
-        <PromptAndResponse
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-6 py-8">
+        <PhaseCard
           phaseId="discussion"
-          labId={params.lab_id}
-          prompt="Write your response to the discussion prompts."
-          placeholder="Note where you agreed with your peers, and where you didn't."
-        />
-      </PhaseCard>
-      <TutorPanel labId={params.lab_id} currentPhase="discussion" />
-    </>
+          phaseIndex={4}
+          scaffolding={spec.discussion.scaffolding_level}
+          subtitle="Compare your findings with others."
+        >
+          <DiscussionContent discussion={spec.discussion} />
+          <hr className="border-surface-border" />
+          <PromptAndResponse
+            phaseId="discussion"
+            labId={params.lab_id}
+            prompt="Write your response to the discussion prompts."
+            placeholder="Note where you agreed with your peers, and where you didn't."
+          />
+        </PhaseCard>
+        <TutorPanel labId={params.lab_id} currentPhase="discussion" />
+      </div>
+    </div>
   );
 }

@@ -98,6 +98,11 @@ export interface ScienceModel {
   variables: Variable[];
   rules: Rule[];
   decision_tables?: DecisionTable[];
+  /**
+   * Schema v2. Plain-language statements of where the model stops being
+   * scientifically honest (e.g. "Bulb resistance treated as constant").
+   */
+  validity_bounds?: string[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -146,6 +151,13 @@ export interface Experiment {
   measured_vars: string[];
   /** Rule ids this experiment expects to exercise. Used by tests to check coverage. */
   exercises_rules?: string[];
+  /**
+   * Schema v2. Input variable id → starting value for this experiment.
+   * Each key must be a declared `input`-role variable and each value must
+   * pass that variable's type and range/options. Prediction checks (T2)
+   * evaluate `correct_when` at this point.
+   */
+  preset?: Record<string, string | number | boolean>;
 }
 
 export interface Investigation {
@@ -208,6 +220,81 @@ export interface AiTutorConfig {
 }
 
 /* ------------------------------------------------------------------ */
+/* Schema v2 — prediction gate, misconceptions, choice points          */
+/* All optional; a v1 spec omits them entirely.                        */
+/* ------------------------------------------------------------------ */
+
+/** How the student commits a prediction. No free text in v2. */
+export type PredictionInputMode = "choice" | "sort" | "numeric";
+
+export interface PredictionOption {
+  id: string;
+  label: string;
+  /**
+   * Condition over variable ids, evaluated by the engine against the
+   * experiment's outputs (e.g. "i_after_bulb1 < i_before_bulb1"). This is
+   * the answer key: it must never reach the client or the tutor.
+   */
+  correct_when: string;
+  /** Misconception id this option reveals, or null/omitted for none. */
+  maps_to_misconception?: string | null;
+}
+
+export interface PredictionItem {
+  id: string;
+  /** Experiment whose run resolves this prediction. */
+  experiment_ref: string;
+  question: string;
+  options: PredictionOption[];
+}
+
+export interface Prediction {
+  /** When true, the student must commit a prediction before running. */
+  gate: boolean;
+  input_mode: PredictionInputMode;
+  items: PredictionItem[];
+}
+
+/**
+ * The post-discrepancy sequence. A failed prediction is an opportunity
+ * for conceptual revision, not proof of it, so all four are required.
+ */
+export interface MisconceptionRevision {
+  explain_prompt: string;
+  compare_prompt: string;
+  revise_prompt: string;
+  /**
+   * Teacher-authored model, shown only after a revision attempt. The
+   * tutor may not state it.
+   */
+  alternative_model: string;
+}
+
+export interface Misconception {
+  id: string;
+  statement: string;
+  /** Research citation for the misconception. */
+  source: string;
+  /** Deterministic trigger — no LLM in detection. */
+  detected_when: { prediction_option: string };
+  discrepant_event: { experiment_ref: string };
+  revision: MisconceptionRevision;
+}
+
+export interface ChoicePointOption {
+  id: string;
+  label: string;
+  routes_to_misconception: string;
+}
+
+/** Bounded learner agency: a choice of what to test next. */
+export interface ChoicePoint {
+  id: string;
+  prompt: string;
+  options: ChoicePointOption[];
+}
+
+/* ------------------------------------------------------------------ */
 /* The top-level LabSpec                                               */
 /* ------------------------------------------------------------------ */
 
@@ -223,6 +310,12 @@ export interface LabSpec {
   reflection: Reflection;
   assessment: Assessment;
   ai_tutor_config: AiTutorConfig;
+  /** Schema v2. */
+  prediction?: Prediction;
+  /** Schema v2. */
+  misconceptions?: Misconception[];
+  /** Schema v2. */
+  choice_points?: ChoicePoint[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -280,6 +373,13 @@ export function asValidatedLabSpec(spec: LabSpec): ValidatedLabSpec {
  *     sliders, dropdowns, and axis labels. This is the only legitimate
  *     client use of anything under `science_model`.
  *
+ *   - Schema v2 `prediction` is included only as `PublicPrediction`:
+ *     questions and option labels, with `correct_when` (the answer key)
+ *     and `maps_to_misconception` removed. `misconceptions` and
+ *     `choice_points` are NOT included: `alternative_model` must stay
+ *     hidden until a revision attempt, and the server hands out the
+ *     revision prompts only after a prediction is resolved.
+ *
  *   - The brand is dropped by construction — `PublicLabSpec` is a plain
  *     interface with no `unique symbol` phantom field, so it is fully
  *     serialisable in the RSC payload.
@@ -297,4 +397,18 @@ export interface PublicLabSpec {
   reflection: Reflection;
   assessment: Assessment;
   ai_tutor_config: AiTutorConfig;
+  /** Schema v2, redacted. */
+  prediction?: PublicPrediction;
+}
+
+/** Client-safe prediction: no answer key, no misconception mapping. */
+export interface PublicPrediction {
+  gate: boolean;
+  input_mode: PredictionInputMode;
+  items: Array<{
+    id: string;
+    experiment_ref: string;
+    question: string;
+    options: Array<{ id: string; label: string }>;
+  }>;
 }

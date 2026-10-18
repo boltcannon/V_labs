@@ -1,8 +1,11 @@
 /**
- * Spec loader — reads a YAML file, validates it against the Zod schema, and
- * returns a strongly-typed LabSpec. The loader is the only sanctioned entry
- * point into the engine: a spec that has not been validated here must not be
- * handed to `runLab()`.
+ * Spec loader — reads a YAML file, validates it against the Zod schema and
+ * then the spec validator (V1–V7), and returns a strongly-typed LabSpec.
+ * The loader is the only sanctioned entry point into the engine: a spec
+ * that has not been validated here must not be handed to `runLab()`.
+ *
+ * The authoring wizard's save action validates through `parseLabSpec`
+ * too, so a wizard-authored spec faces exactly the same checks.
  */
 
 import * as fs from "node:fs";
@@ -13,6 +16,7 @@ import {
   type LabSpec,
   type ValidatedLabSpec,
 } from "../schema/lab-spec";
+import { validateSpec } from "../validator/spec-validator";
 
 export class SpecValidationError extends Error {
   constructor(
@@ -27,9 +31,18 @@ export class SpecValidationError extends Error {
   }
 }
 
+export interface ParseLabSpecOptions {
+  /**
+   * Run the spec validator (V1–V7) after Zod. Default true. Only tests
+   * that inspect `validateSpec` issues directly should pass false.
+   */
+  runSpecValidator?: boolean;
+}
+
 export function parseLabSpec(
   yamlText: string,
   sourcePath = "<inline>",
+  options: ParseLabSpecOptions = {},
 ): ValidatedLabSpec {
   let parsed: unknown;
   try {
@@ -53,8 +66,21 @@ export function parseLabSpec(
   // `T | undefined`, whereas our canonical LabSpec type declares them as
   // `T?`. The two are structurally identical at runtime; cast at the
   // boundary and then brand — the brand is the ticket the engine accepts.
-  const spec = result.data as unknown as LabSpec;
-  return asValidatedLabSpec(spec);
+  const spec = asValidatedLabSpec(result.data as unknown as LabSpec);
+
+  // Spec validator: cross-references and engine-evaluated checks Zod
+  // can't express. A failing spec throws here, so the branded value
+  // never leaves the loader.
+  if (options.runSpecValidator ?? true) {
+    const issues = validateSpec(spec);
+    if (issues.length > 0) {
+      throw new SpecValidationError(
+        sourcePath,
+        issues.map((i) => ({ path: i.path, message: `${i.rule}: ${i.message}` })),
+      );
+    }
+  }
+  return spec;
 }
 
 export function loadLabSpecFromFile(filePath: string): ValidatedLabSpec {

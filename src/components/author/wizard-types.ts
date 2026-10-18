@@ -62,18 +62,10 @@ export interface WizardStep {
 }
 
 export const WIZARD_STEPS: WizardStep[] = [
-  { id: "meta", label: "Lab Metadata", shortLabel: "Meta" },
-  { id: "curriculum", label: "Curriculum Alignment", shortLabel: "Curriculum" },
-  { id: "variables", label: "Variables", shortLabel: "Variables" },
-  { id: "rules", label: "Rules", shortLabel: "Rules" },
-  { id: "decision_tables", label: "Decision Tables", shortLabel: "Tables" },
-  { id: "provocation", label: "Provocation", shortLabel: "Provocation" },
-  { id: "ncl", label: "New Content Learning", shortLabel: "NCL" },
-  { id: "investigation", label: "Investigation", shortLabel: "Investigation" },
-  { id: "analysis", label: "Analysis", shortLabel: "Analysis" },
-  { id: "discussion", label: "Discussion", shortLabel: "Discussion" },
-  { id: "reflection", label: "Reflection", shortLabel: "Reflection" },
-  { id: "assessment", label: "Assessment & AI Tutor", shortLabel: "Assessment" },
+  { id: "about", label: "About the Lab", shortLabel: "About" },
+  { id: "science", label: "Science Model", shortLabel: "Science" },
+  { id: "phases", label: "Lab Phases", shortLabel: "Phases" },
+  { id: "tutor", label: "AI Tutor & Assessment", shortLabel: "Tutor" },
 ];
 
 /* ------------------------------------------------------------------ */

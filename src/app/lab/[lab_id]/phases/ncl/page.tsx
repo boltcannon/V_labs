@@ -11,23 +11,25 @@ interface Props {
 export default function NclPage({ params }: Props) {
   const spec = getLabSpec(params.lab_id);
   return (
-    <>
-      <PhaseCard
-        phaseId="ncl"
-        phaseIndex={1}
-        scaffolding={spec.ncl.scaffolding_level}
-        subtitle="The vocabulary and ideas you'll need."
-      >
-        <NclContent ncl={spec.ncl} />
-        <hr className="border-surface-border" />
-        <PromptAndResponse
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-6 py-8">
+        <PhaseCard
           phaseId="ncl"
-          labId={params.lab_id}
-          prompt="Note one thing that surprised you, and one question you still have."
-          placeholder="Something you didn't expect · one open question"
-        />
-      </PhaseCard>
-      <TutorPanel labId={params.lab_id} currentPhase="ncl" />
-    </>
+          phaseIndex={1}
+          scaffolding={spec.ncl.scaffolding_level}
+          subtitle="The vocabulary and ideas you'll need."
+        >
+          <NclContent ncl={spec.ncl} />
+          <hr className="border-surface-border" />
+          <PromptAndResponse
+            phaseId="ncl"
+            labId={params.lab_id}
+            prompt="Note one thing that surprised you, and one question you still have."
+            placeholder="Something you didn't expect · one open question"
+          />
+        </PhaseCard>
+        <TutorPanel labId={params.lab_id} currentPhase="ncl" />
+      </div>
+    </div>
   );
 }

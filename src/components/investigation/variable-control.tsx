@@ -24,6 +24,13 @@ interface Props {
   variable: Variable;
   value: Scalar | undefined;
   onChange: (v: Scalar) => void;
+  /**
+   * Called once the value has settled: slider released (pointer, touch or
+   * a keyboard step), number field blurred with a changed value, select
+   * changed, or toggle clicked. Optional — labs without a live stage
+   * ignore it and keep the explicit Run button.
+   */
+  onCommit?: ((v: Scalar) => void) | undefined;
   disabled?: boolean;
 }
 
@@ -35,6 +42,12 @@ export function defaultValue(v: Variable): Scalar {
   return 0;
 }
 
+/** Keys that change a range input's value. */
+export const SLIDER_KEYS: ReadonlySet<string> = new Set([
+  "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+  "Home", "End", "PageUp", "PageDown",
+]);
+
 function sliderStep(min: number, max: number): number {
   const span = max - min;
   if (span <= 20) return 1;
@@ -45,6 +58,7 @@ function NumberControl({
   variable,
   value,
   onChange,
+  onCommit,
   disabled,
 }: Props & { value: number }) {
   const [min, max] = variable.range ?? [0, 100];
@@ -65,7 +79,20 @@ function NumberControl({
     }
     const clamped = Math.min(max, Math.max(min, n));
     setText(String(clamped));
-    if (clamped !== value) onChange(clamped);
+    if (clamped !== value) {
+      onChange(clamped);
+      onCommit?.(clamped);
+    }
+  };
+
+  // Slider release. Reads the input's own value so the commit never lags
+  // a pending state update from the last onChange.
+  const commitSlider = (e: { currentTarget: HTMLInputElement }) =>
+    onCommit?.(Number(e.currentTarget.value));
+  // Only keys that move the slider count as a release. Otherwise e.g. the
+  // keyup of the Tab that moved focus here would commit a stale value.
+  const commitSliderKey = (e: { key: string; currentTarget: HTMLInputElement }) => {
+    if (SLIDER_KEYS.has(e.key)) commitSlider(e);
   };
 
   return (
@@ -97,6 +124,8 @@ function NumberControl({
         value={value}
         disabled={disabled ?? false}
         onChange={(e) => onChange(Number(e.target.value))}
+        onPointerUp={commitSlider}
+        onKeyUp={commitSliderKey}
         className="w-full accent-accent"
         aria-label={variable.label}
       />
@@ -112,6 +141,7 @@ function CategoricalControl({
   variable,
   value,
   onChange,
+  onCommit,
   disabled,
 }: Props & { value: string }) {
   return (
@@ -122,7 +152,10 @@ function CategoricalControl({
       <select
         value={value}
         disabled={disabled ?? false}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          onCommit?.(e.target.value);
+        }}
         aria-label={variable.label}
         className="w-full rounded-md border border-surface-border bg-surface px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
@@ -140,6 +173,7 @@ function BooleanControl({
   variable,
   value,
   onChange,
+  onCommit,
   disabled,
 }: Props & { value: boolean }) {
   return (
@@ -153,7 +187,10 @@ function BooleanControl({
               key={v}
               type="button"
               disabled={disabled ?? false}
-              onClick={() => onChange(v === "true")}
+              onClick={() => {
+                onChange(v === "true");
+                onCommit?.(v === "true");
+              }}
               className={cn(
                 "px-3 py-1.5 text-sm transition",
                 selected

@@ -22,6 +22,9 @@ export default defineConfig(async () => {
   const { default: tsconfigPaths } = await import("vite-tsconfig-paths");
   return {
     plugins: [tsconfigPaths()],
+    // Compile JSX with the automatic runtime, as Next.js does, so a
+    // component that never imports React still renders under Vitest.
+    esbuild: { jsx: "automatic" },
     resolve: {
       alias: {
         // `server-only` throws on import outside an RSC context. Stub it

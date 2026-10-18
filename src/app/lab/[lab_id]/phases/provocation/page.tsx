@@ -11,23 +11,25 @@ interface Props {
 export default function ProvocationPage({ params }: Props) {
   const spec = getLabSpec(params.lab_id);
   return (
-    <>
-      <PhaseCard
-        phaseId="provocation"
-        phaseIndex={0}
-        scaffolding={spec.provocation.scaffolding_level}
-        subtitle="Ground the lab in something real."
-      >
-        <ProvocationContent provocation={spec.provocation} />
-        <hr className="border-surface-border" />
-        <PromptAndResponse
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-6 py-8">
+        <PhaseCard
           phaseId="provocation"
-          labId={params.lab_id}
-          prompt="Write your initial thoughts on the motivating question."
-          placeholder="What do you already think about this? Two or three sentences is fine."
-        />
-      </PhaseCard>
-      <TutorPanel labId={params.lab_id} currentPhase="provocation" />
-    </>
+          phaseIndex={0}
+          scaffolding={spec.provocation.scaffolding_level}
+          subtitle="Ground the lab in something real."
+        >
+          <ProvocationContent provocation={spec.provocation} />
+          <hr className="border-surface-border" />
+          <PromptAndResponse
+            phaseId="provocation"
+            labId={params.lab_id}
+            prompt="Write your initial thoughts on the motivating question."
+            placeholder="What do you already think about this? Two or three sentences is fine."
+          />
+        </PhaseCard>
+        <TutorPanel labId={params.lab_id} currentPhase="provocation" />
+      </div>
+    </div>
   );
 }

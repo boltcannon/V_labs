@@ -15,10 +15,34 @@
 import type {
   ValidatedLabSpec,
   PublicLabSpec,
+  PublicPrediction,
 } from "@/schema/lab-spec";
 
-export function toPublicLabSpec(spec: ValidatedLabSpec): PublicLabSpec {
+/**
+ * Schema v2 prediction, redacted for the client: questions and option
+ * labels only. `correct_when` and `maps_to_misconception` stay on the
+ * server; resolution happens in the `resolvePrediction` Server Action.
+ */
+export function toPublicPrediction(
+  spec: ValidatedLabSpec,
+): PublicPrediction | undefined {
+  if (!spec.prediction) return undefined;
   return {
+    gate: spec.prediction.gate,
+    input_mode: spec.prediction.input_mode,
+    items: spec.prediction.items.map((item) => ({
+      id: item.id,
+      experiment_ref: item.experiment_ref,
+      question: item.question,
+      options: item.options.map((o) => ({ id: o.id, label: o.label })),
+    })),
+  };
+}
+
+export function toPublicLabSpec(spec: ValidatedLabSpec): PublicLabSpec {
+  const prediction = toPublicPrediction(spec);
+  return {
+    ...(prediction ? { prediction } : {}),
     meta: spec.meta,
     curriculum_alignment: spec.curriculum_alignment,
     science_model: { variables: spec.science_model.variables },
