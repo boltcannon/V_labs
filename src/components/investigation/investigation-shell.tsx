@@ -60,6 +60,14 @@ import { cn } from "@/lib/cn";
 import { VariableControl, VariableReadonly, defaultValue } from "./variable-control";
 import { ResultsPanel } from "./results-panel";
 import { RunHistoryTable } from "./run-history-table";
+import { RunGraph } from "./run-graph";
+import {
+  defaultAxes,
+  graphPoints,
+  numericInputs,
+  numericOutputs,
+  type AxisChoice,
+} from "./run-graph-data";
 import { PredictionPanel } from "./prediction-panel";
 import { CircuitStage } from "@/components/stage/circuit-stage";
 import { circuitStagePropsFromRun } from "@/components/stage/circuit-stage-adapter";
@@ -72,9 +80,8 @@ interface Props {
   /** Schema v2, redacted (no answer key). Absent for v1 labs. */
   prediction?: PublicPrediction | undefined;
   /**
-   * Live visual stage for this lab, if any. When set, settling a control
-   * runs the engine (via the runExperiment Server Action) and the stage
-   * redraws from the run's outputs.
+   * Live visual stage for this lab, if any. It redraws from each run's
+   * outputs (every lab runs the engine when a control settles).
    */
   stage?: StageKind | undefined;
 }
@@ -159,6 +166,7 @@ export function InvestigationShell({ labId, investigation, variables, prediction
 
   const [runs, setRuns] = useState<ExperimentRun[]>([]);
   const [historyFilter, setHistoryFilter] = useState<string>("all");
+  const [axesByTab, setAxesByTab] = useState<Record<string, AxisChoice>>({});
   const [pending, startTransition] = useTransition();
   const [lastError, setLastError] = useState<string | null>(null);
 
@@ -258,9 +266,21 @@ export function InvestigationShell({ labId, investigation, variables, prediction
   const freeLocked = currentTab.id === FREE_EXPLORATION_ID && !allPredictionsDone;
   const tabLocked = currentItem !== undefined && !isRunUnlocked(currentPrediction);
   const runLocked = tabLocked || freeLocked;
-  // With a live stage, releasing a slider runs the engine — unless the
-  // prediction gate still holds this tab.
-  const autoRun = stage !== undefined && !runLocked;
+  // Settling a control (slider release, field blur, select change) runs
+  // the engine in every lab — unless the prediction gate holds this tab.
+  // The Run button stays as an explicit alternative.
+  const autoRun = !runLocked;
+
+  /* ---- Live run graph ---- */
+  const tabDefaultAxes = defaultAxes(currentTab, variables, investigation.explorable_variables);
+  const axes = axesByTab[currentTab.id] ?? tabDefaultAxes;
+  const xVar = axes ? varsById.get(axes.x) : undefined;
+  const yVar = axes ? varsById.get(axes.y) : undefined;
+  const points = axes ? graphPoints(runs, currentTab.id, axes.x, axes.y) : [];
+  const setAxis = (which: "x" | "y", id: string) => {
+    if (!axes) return;
+    setAxesByTab((prev) => ({ ...prev, [currentTab.id]: { ...axes, [which]: id } }));
+  };
   // The stage draws the latest run, but stays idle on a locked tab so it
   // can't show a reading before the student has predicted it.
   const stageOutputs = runLocked ? null : runs[runs.length - 1]?.outputs ?? null;
@@ -430,7 +450,7 @@ export function InvestigationShell({ labId, investigation, variables, prediction
                   value={varValues[id]}
                   onChange={(nv) => setValue(id, nv)}
                   onCommit={autoRun ? (nv) => runNow({ [id]: nv }) : undefined}
-                  disabled={pending || runLocked}
+                  disabled={runLocked}
                 />
               );
             })}
@@ -446,10 +466,10 @@ export function InvestigationShell({ labId, investigation, variables, prediction
               <button
                 type="button"
                 onClick={() => setConstantsOpen((v) => !v)}
-                disabled={pending || runLocked}
+                disabled={runLocked}
                 className={cn(
                   "inline-flex items-center gap-1 text-xs text-accent-strong hover:text-accent transition",
-                  (pending || runLocked) && "opacity-50 cursor-not-allowed",
+                  runLocked && "opacity-50 cursor-not-allowed",
                 )}
                 aria-expanded={constantsOpen}
               >
@@ -478,7 +498,7 @@ export function InvestigationShell({ labId, investigation, variables, prediction
                       value={varValues[id]}
                       onChange={(nv) => setValue(id, nv)}
                       onCommit={autoRun ? (nv) => runNow({ [id]: nv }) : undefined}
-                      disabled={pending || runLocked}
+                      disabled={runLocked}
                     />
                   );
                 })}
@@ -506,7 +526,7 @@ export function InvestigationShell({ labId, investigation, variables, prediction
       <div className="flex items-center justify-between">
         <div className="text-xs text-text-soft">
           {runs.length === 0 ? (
-            "No runs yet"
+            runLocked ? "No runs yet" : "Change a value — the experiment runs when you let go."
           ) : (
             <>
               {runs.length} run{runs.length === 1 ? "" : "s"} recorded
@@ -534,6 +554,46 @@ export function InvestigationShell({ labId, investigation, variables, prediction
           error={lastError}
         />
       </div>
+
+      {/* Live graph of this tab's runs — engine values only, points only */}
+      {axes && xVar && yVar && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+              Graph — {currentTab.label} runs
+            </div>
+            <div className="flex items-center gap-2 text-xs text-text-muted">
+              <label className="flex items-center gap-1">
+                y
+                <select
+                  aria-label="Graph y-axis"
+                  value={axes.y}
+                  onChange={(e) => setAxis("y", e.target.value)}
+                  className="rounded-md border border-surface-border bg-surface px-2 py-1 text-xs"
+                >
+                  {numericOutputs(variables).map((v) => (
+                    <option key={v.id} value={v.id}>{v.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-1">
+                x
+                <select
+                  aria-label="Graph x-axis"
+                  value={axes.x}
+                  onChange={(e) => setAxis("x", e.target.value)}
+                  className="rounded-md border border-surface-border bg-surface px-2 py-1 text-xs"
+                >
+                  {numericInputs(variables, investigation.explorable_variables).map((v) => (
+                    <option key={v.id} value={v.id}>{v.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+          <RunGraph points={points} xVar={xVar} yVar={yVar} latestRunId={runs[runs.length - 1]?.id} />
+        </div>
+      )}
 
       {/* History */}
       <RunHistoryTable
