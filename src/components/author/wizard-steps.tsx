@@ -1,13 +1,5 @@
 "use client";
 
-/**
- * Wizard step components — one per LabSpec section.
- *
- * Each step renders a form for its section of the WizardState.
- * All steps are controlled: they receive state + onChange callbacks.
- * No step talks to the server — the wizard shell handles that.
- */
-
 import { useState, useMemo } from "react";
 import type {
   Variable,
@@ -33,9 +25,9 @@ import {
 } from "./decision-table-builder";
 import { cn } from "@/lib/cn";
 
-/* ------------------------------------------------------------------ */
-/*  Shared sub-components                                               */
-/* ------------------------------------------------------------------ */
+/* ================================================================== */
+/*  Shared sub-components                                              */
+/* ================================================================== */
 
 function FieldLabel({
   children,
@@ -124,7 +116,6 @@ function SelectInput({
   );
 }
 
-/** Editable list of strings with add/remove. */
 function StringListEditor({
   label,
   hint,
@@ -159,7 +150,7 @@ function StringListEditor({
               onClick={() => remove(i)}
               className="text-red-500 hover:text-red-700 text-xs px-2 transition shrink-0"
             >
-              ✕
+              &#10005;
             </button>
           )}
         </div>
@@ -207,11 +198,45 @@ function ScaffoldingLevelPicker({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Step 1: Meta                                                       */
-/* ------------------------------------------------------------------ */
+function Section({
+  title,
+  description,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  description?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-lg border border-surface-border overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-surface-muted/50 hover:bg-surface-muted transition text-left"
+      >
+        <div>
+          <span className="text-sm font-semibold text-text">{title}</span>
+          {description && (
+            <p className="text-xs text-text-muted mt-0.5">{description}</p>
+          )}
+        </div>
+        <span className="text-text-soft text-xs shrink-0 ml-2">
+          {open ? "Hide" : "Show"}
+        </span>
+      </button>
+      {open && <div className="p-4 space-y-4 border-t border-surface-border">{children}</div>}
+    </div>
+  );
+}
 
-export function StepMeta({
+/* ================================================================== */
+/*  Step 1: About the Lab (Meta + Curriculum)                          */
+/* ================================================================== */
+
+export function StepAbout({
   state,
   onChange,
 }: {
@@ -219,120 +244,110 @@ export function StepMeta({
   onChange: (s: WizardState) => void;
 }) {
   const m = state.meta;
-  const set = (patch: Partial<typeof m>) =>
-    onChange({ ...state, meta: { ...m, ...patch } });
-
-  return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <FieldLabel>Topic</FieldLabel>
-        <TextInput
-          value={m.topic}
-          onChange={(v) => set({ topic: v })}
-          placeholder="e.g. Pressure and its Effects"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <FieldLabel>NCERT Class</FieldLabel>
-          <SelectInput
-            value={String(m.ncert_class)}
-            onChange={(v) => set({ ncert_class: Number(v) as NcertClass })}
-            options={[6, 7, 8, 9, 10].map((n) => ({
-              value: String(n),
-              label: `Class ${n}`,
-            }))}
-          />
-        </div>
-        <div className="space-y-1">
-          <FieldLabel>Subject</FieldLabel>
-          <SelectInput
-            value={m.subject}
-            onChange={(v) => set({ subject: v as Subject })}
-            options={[
-              { value: "physics", label: "Physics" },
-              { value: "chemistry", label: "Chemistry" },
-              { value: "biology", label: "Biology" },
-              { value: "integrated-science", label: "Integrated Science" },
-            ]}
-          />
-        </div>
-      </div>
-      <div className="space-y-1">
-        <FieldLabel>Chapter Reference</FieldLabel>
-        <TextInput
-          value={m.chapter_reference}
-          onChange={(v) => set({ chapter_reference: v })}
-          placeholder="e.g. NCERT Science Class 8, Chapter 11: Force and Pressure"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <FieldLabel hint="minutes">Estimated Duration</FieldLabel>
-          <TextInput
-            value={String(m.estimated_duration_minutes)}
-            onChange={(v) =>
-              set({ estimated_duration_minutes: Number(v) || 0 })
-            }
-            type="number"
-          />
-        </div>
-        <div className="space-y-1">
-          <FieldLabel>Spec Version</FieldLabel>
-          <TextInput
-            value={m.spec_version}
-            onChange={(v) => set({ spec_version: v })}
-            placeholder="0.1.0"
-          />
-        </div>
-      </div>
-      <StringListEditor
-        label="Authors"
-        items={m.authors}
-        onChange={(v) => set({ authors: v })}
-        placeholder="e.g. Teacher Name (School)"
-      />
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Step 2: Curriculum Alignment                                       */
-/* ------------------------------------------------------------------ */
-
-export function StepCurriculum({
-  state,
-  onChange,
-}: {
-  state: WizardState;
-  onChange: (s: WizardState) => void;
-}) {
   const ca = state.curriculum_alignment;
-  const set = (patch: Partial<typeof ca>) =>
+  const setM = (patch: Partial<typeof m>) =>
+    onChange({ ...state, meta: { ...m, ...patch } });
+  const setCa = (patch: Partial<typeof ca>) =>
     onChange({ ...state, curriculum_alignment: { ...ca, ...patch } });
 
   return (
-    <div className="space-y-4">
-      <StringListEditor
-        label="Learning Outcomes"
-        hint="at least 1"
-        items={ca.learning_outcomes}
-        onChange={(v) => set({ learning_outcomes: v })}
-        placeholder="Students will be able to..."
-      />
-      <StringListEditor
-        label="Prior Knowledge Assumed"
-        items={ca.prior_knowledge_assumed}
-        onChange={(v) => set({ prior_knowledge_assumed: v })}
-        placeholder="Understands..."
-      />
+    <div className="space-y-6">
+      <Section title="Basic Information" description="What is this lab about?">
+        <div className="space-y-1">
+          <FieldLabel>Topic</FieldLabel>
+          <TextInput
+            value={m.topic}
+            onChange={(v) => setM({ topic: v })}
+            placeholder="e.g. Pressure and its Effects"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <FieldLabel>NCERT Class</FieldLabel>
+            <SelectInput
+              value={String(m.ncert_class)}
+              onChange={(v) => setM({ ncert_class: Number(v) as NcertClass })}
+              options={[6, 7, 8, 9, 10].map((n) => ({
+                value: String(n),
+                label: `Class ${n}`,
+              }))}
+            />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel>Subject</FieldLabel>
+            <SelectInput
+              value={m.subject}
+              onChange={(v) => setM({ subject: v as Subject })}
+              options={[
+                { value: "physics", label: "Physics" },
+                { value: "chemistry", label: "Chemistry" },
+                { value: "biology", label: "Biology" },
+                { value: "integrated-science", label: "Integrated Science" },
+              ]}
+            />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <FieldLabel>Chapter Reference</FieldLabel>
+          <TextInput
+            value={m.chapter_reference}
+            onChange={(v) => setM({ chapter_reference: v })}
+            placeholder="e.g. NCERT Science Class 8, Chapter 11: Force and Pressure"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <FieldLabel hint="minutes">Estimated Duration</FieldLabel>
+            <TextInput
+              value={String(m.estimated_duration_minutes)}
+              onChange={(v) =>
+                setM({ estimated_duration_minutes: Number(v) || 0 })
+              }
+              type="number"
+            />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel>Spec Version</FieldLabel>
+            <TextInput
+              value={m.spec_version}
+              onChange={(v) => setM({ spec_version: v })}
+              placeholder="0.1.0"
+            />
+          </div>
+        </div>
+        <StringListEditor
+          label="Authors"
+          items={m.authors}
+          onChange={(v) => setM({ authors: v })}
+          placeholder="e.g. Teacher Name (School)"
+        />
+      </Section>
+
+      <Section
+        title="Curriculum Alignment"
+        description="What should students learn from this lab?"
+      >
+        <StringListEditor
+          label="Learning Outcomes"
+          hint="at least 1"
+          items={ca.learning_outcomes}
+          onChange={(v) => setCa({ learning_outcomes: v })}
+          placeholder="Students will be able to..."
+        />
+        <StringListEditor
+          label="Prior Knowledge Assumed"
+          items={ca.prior_knowledge_assumed}
+          onChange={(v) => setCa({ prior_knowledge_assumed: v })}
+          placeholder="Understands..."
+        />
+      </Section>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Step 3: Variables                                                   */
-/* ------------------------------------------------------------------ */
+/* ================================================================== */
+/*  Step 2: Science Model (Variables + Rules + Decision Tables)        */
+/* ================================================================== */
 
 function VariableEditor({
   variable,
@@ -349,7 +364,9 @@ function VariableEditor({
   return (
     <div className="rounded-lg border border-surface-border p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="font-mono text-sm text-accent">{variable.id || "new_variable"}</span>
+        <span className="font-mono text-sm text-accent">
+          {variable.id || "new_variable"}
+        </span>
         <button
           type="button"
           onClick={onRemove}
@@ -384,9 +401,17 @@ function VariableEditor({
             onChange={(v) => {
               const { range: _r, options: _o, ...rest } = variable;
               if (v === "number") {
-                onChange({ ...rest, type: v, range: variable.range ?? [0, 100] });
+                onChange({
+                  ...rest,
+                  type: v,
+                  range: variable.range ?? [0, 100],
+                });
               } else if (v === "categorical") {
-                onChange({ ...rest, type: v, options: variable.options ?? ["option_a", "option_b"] });
+                onChange({
+                  ...rest,
+                  type: v,
+                  options: variable.options ?? ["option_a", "option_b"],
+                });
               } else {
                 onChange({ ...rest, type: v as Variable["type"] });
               }
@@ -415,7 +440,7 @@ function VariableEditor({
           <TextInput
             value={variable.unit ?? ""}
             onChange={(v) => set({ unit: v || null })}
-            placeholder="e.g. N/m²"
+            placeholder="e.g. N/m^2"
           />
         </div>
       </div>
@@ -460,7 +485,9 @@ function VariableEditor({
             if (v) {
               set({ description: v });
             } else {
-              set({ description: undefined } as Partial<Variable> & { description?: string | undefined });
+              set({
+                description: undefined,
+              } as Partial<Variable> & { description?: string | undefined });
             }
           }}
           placeholder="Brief description of what this variable represents"
@@ -469,72 +496,6 @@ function VariableEditor({
     </div>
   );
 }
-
-export function StepVariables({
-  state,
-  onChange,
-}: {
-  state: WizardState;
-  onChange: (s: WizardState) => void;
-}) {
-  const addVariable = () => {
-    onChange({
-      ...state,
-      variables: [
-        ...state.variables,
-        {
-          id: "",
-          label: "",
-          type: "number",
-          unit: null,
-          range: [0, 100],
-          role: "input",
-        },
-      ],
-    });
-  };
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-text-muted">
-        Declare all variables in the science model. Number variables need a
-        range; categorical variables need options (at least 2); boolean
-        variables need neither.
-      </p>
-      {state.variables.map((v, i) => (
-        <VariableEditor
-          key={i}
-          variable={v}
-          onChange={(updated) =>
-            onChange({
-              ...state,
-              variables: state.variables.map((vv, idx) =>
-                idx === i ? updated : vv,
-              ),
-            })
-          }
-          onRemove={() =>
-            onChange({
-              ...state,
-              variables: state.variables.filter((_, idx) => idx !== i),
-            })
-          }
-        />
-      ))}
-      <button
-        type="button"
-        onClick={addVariable}
-        className="w-full py-3 text-sm rounded-md border border-dashed border-surface-border text-text-muted hover:border-accent hover:text-accent transition"
-      >
-        + Add Variable
-      </button>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Step 4: Rules (with Pattern Picker + Raw Expression escape hatch)  */
-/* ------------------------------------------------------------------ */
 
 function RawExpressionInput({
   onAdd,
@@ -550,7 +511,6 @@ function RawExpressionInput({
   const [validatedBy, setValidatedBy] = useState("");
   const [parseError, setParseError] = useState<string | null>(null);
 
-  /** Live parse-only validation using the engine's parser. */
   const validateExpression = (expr: string) => {
     setExpression(expr);
     if (!expr.trim()) {
@@ -558,15 +518,11 @@ function RawExpressionInput({
       return;
     }
     try {
-      // Dynamic import would be cleaner, but parseRuleExpression is a
-      // pure function with no server deps — it's safe to import directly.
       const { parseRuleExpression } = require("@/engine/expression-evaluator");
       parseRuleExpression(expr);
       setParseError(null);
     } catch (err) {
-      setParseError(
-        err instanceof Error ? err.message : "Parse error",
-      );
+      setParseError(err instanceof Error ? err.message : "Parse error");
     }
   };
 
@@ -600,7 +556,7 @@ function RawExpressionInput({
         onClick={() => setExpanded(true)}
         className="text-sm text-text-muted hover:text-accent transition"
       >
-        ▸ Advanced: raw expression
+        Advanced: write a raw expression
       </button>
     );
   }
@@ -609,19 +565,18 @@ function RawExpressionInput({
     <div className="rounded-lg border border-surface-border bg-surface-muted/30 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-text">
-          Advanced: raw expression
+          Raw expression
         </span>
         <button
           type="button"
           onClick={() => setExpanded(false)}
           className="text-xs text-text-muted hover:text-text transition"
         >
-          ▾ Collapse
+          Collapse
         </button>
       </div>
       <p className="text-xs text-text-muted">
-        Type an expression directly using the engine&apos;s syntax. The parser
-        validates it live — only parseable expressions can be added.
+        Type an expression directly. The parser validates it live.
       </p>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
@@ -660,7 +615,7 @@ function RawExpressionInput({
           <p className="text-xs text-red-600 mt-1">{parseError}</p>
         )}
         {expression.trim() && !parseError && (
-          <p className="text-xs text-green-600 mt-1">✓ Valid expression</p>
+          <p className="text-xs text-green-600 mt-1">Valid expression</p>
         )}
       </div>
       <button
@@ -680,7 +635,7 @@ function RawExpressionInput({
   );
 }
 
-export function StepRules({
+export function StepScience({
   state,
   onChange,
 }: {
@@ -688,11 +643,32 @@ export function StepRules({
   onChange: (s: WizardState) => void;
 }) {
   const [showPicker, setShowPicker] = useState(false);
+  const [showBuilder, setShowBuilder] = useState(false);
+
   const existingRuleIds = useMemo(
     () => new Set(state.rules.map((r) => r.id)),
     [state.rules],
   );
 
+  /* -- Variables -- */
+  const addVariable = () => {
+    onChange({
+      ...state,
+      variables: [
+        ...state.variables,
+        {
+          id: "",
+          label: "",
+          type: "number",
+          unit: null,
+          range: [0, 100],
+          role: "input",
+        },
+      ],
+    });
+  };
+
+  /* -- Rules -- */
   const addRuleFromPattern = (result: FormulaPickerResult) => {
     const rule: Rule = {
       id: `${result.outputVarId}_calc`,
@@ -724,97 +700,7 @@ export function StepRules({
     });
   };
 
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-text-muted">
-        Define the computation rules. Use the Formula Pattern Picker for common
-        patterns, or write raw expressions for custom formulas. Decision-table
-        rules are added in the next step.
-      </p>
-
-      {/* Existing rules */}
-      {state.rules.map((rule, i) => (
-        <div
-          key={i}
-          className="rounded-lg border border-surface-border p-4 space-y-2"
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-sm text-accent">{rule.id}</span>
-            <button
-              type="button"
-              onClick={() => removeRule(i)}
-              className="text-red-500 hover:text-red-700 text-xs transition"
-            >
-              Remove
-            </button>
-          </div>
-          {rule.expression && (
-            <div className="font-mono text-sm bg-surface-muted rounded px-3 py-2">
-              {rule.expression}
-            </div>
-          )}
-          {rule.decision_table_ref && (
-            <div className="text-sm text-text-muted">
-              Decision table: <span className="font-mono">{rule.decision_table_ref}</span>
-            </div>
-          )}
-          <div className="space-y-1">
-            <FieldLabel hint="what this rule computes">Description</FieldLabel>
-            <TextInput
-              value={rule.description}
-              onChange={(v) => updateRule(i, { description: v })}
-              placeholder="Description"
-            />
-          </div>
-          <div className="space-y-1">
-            <FieldLabel hint="citation or SME note">Validated By</FieldLabel>
-            <TextInput
-              value={rule.validated_by}
-              onChange={(v) => updateRule(i, { validated_by: v })}
-              placeholder="e.g. NCERT Class 8, Ch 11, §11.2"
-            />
-          </div>
-        </div>
-      ))}
-
-      {/* Pattern picker toggle */}
-      {showPicker ? (
-        <div className="rounded-lg border-2 border-accent/30 p-4">
-          <FormulaPatternPicker
-            variables={state.variables}
-            onComplete={addRuleFromPattern}
-            onCancel={() => setShowPicker(false)}
-          />
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setShowPicker(true)}
-          className="w-full py-3 text-sm rounded-md border border-dashed border-surface-border text-text-muted hover:border-accent hover:text-accent transition"
-        >
-          + Add Rule via Formula Pattern Picker
-        </button>
-      )}
-
-      {/* Raw expression escape hatch */}
-      <RawExpressionInput onAdd={addRawRule} existingIds={existingRuleIds} />
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Step 5: Decision Tables                                            */
-/* ------------------------------------------------------------------ */
-
-export function StepDecisionTables({
-  state,
-  onChange,
-}: {
-  state: WizardState;
-  onChange: (s: WizardState) => void;
-}) {
-  const [showBuilder, setShowBuilder] = useState(false);
-
+  /* -- Decision tables -- */
   const addTableFromBuilder = (result: DecisionTableResult) => {
     const table: DecisionTable = {
       id: result.tableId,
@@ -823,7 +709,6 @@ export function StepDecisionTables({
       rows: result.rows,
       ...(result.defaultValue != null ? { default: result.defaultValue } : {}),
     };
-    // Also create a rule referencing this table
     const rule: Rule = {
       id: `${result.output}_from_table`,
       description: `Classifies ${result.output} using decision table ${result.tableId}.`,
@@ -840,7 +725,6 @@ export function StepDecisionTables({
 
   const removeTable = (i: number) => {
     const table = state.decision_tables[i]!;
-    // Also remove the rule referencing this table
     onChange({
       ...state,
       decision_tables: state.decision_tables.filter((_, idx) => idx !== i),
@@ -849,194 +733,173 @@ export function StepDecisionTables({
   };
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-text-muted">
-        Decision tables map categorical/boolean inputs to categorical/boolean
-        outputs. Adding a table also creates a rule that references it.
-      </p>
-
-      {/* Existing tables */}
-      {state.decision_tables.map((table, i) => (
-        <div
-          key={i}
-          className="rounded-lg border border-surface-border p-4 space-y-2"
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-sm text-accent">{table.id}</span>
-            <button
-              type="button"
-              onClick={() => removeTable(i)}
-              className="text-red-500 hover:text-red-700 text-xs transition"
-            >
-              Remove
-            </button>
-          </div>
-          <div className="text-sm text-text-muted">
-            Inputs: {table.inputs.join(", ")} → Output: {table.output}
-          </div>
-          <div className="text-sm text-text-muted">
-            {table.rows.length} row{table.rows.length !== 1 ? "s" : ""}
-            {table.default !== undefined && `, default: ${table.default}`}
-          </div>
-        </div>
-      ))}
-
-      {/* Builder */}
-      {showBuilder ? (
-        <div className="rounded-lg border-2 border-accent/30 p-4">
-          <DecisionTableBuilder
-            variables={state.variables}
-            onComplete={addTableFromBuilder}
-            onCancel={() => setShowBuilder(false)}
+    <div className="space-y-6">
+      {/* Variables */}
+      <Section
+        title="Variables"
+        description="The quantities students will manipulate and observe"
+      >
+        <p className="text-xs text-text-muted">
+          Number variables need a range; categorical variables need options;
+          boolean variables need neither.
+        </p>
+        {state.variables.map((v, i) => (
+          <VariableEditor
+            key={i}
+            variable={v}
+            onChange={(updated) =>
+              onChange({
+                ...state,
+                variables: state.variables.map((vv, idx) =>
+                  idx === i ? updated : vv,
+                ),
+              })
+            }
+            onRemove={() =>
+              onChange({
+                ...state,
+                variables: state.variables.filter((_, idx) => idx !== i),
+              })
+            }
           />
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setShowBuilder(true)}
-          className="w-full py-3 text-sm rounded-md border border-dashed border-surface-border text-text-muted hover:border-accent hover:text-accent transition"
-        >
-          + Add Decision Table
-        </button>
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Step 6: Provocation                                                */
-/* ------------------------------------------------------------------ */
-
-export function StepProvocation({
-  state,
-  onChange,
-}: {
-  state: WizardState;
-  onChange: (s: WizardState) => void;
-}) {
-  const p = state.provocation;
-  const set = (patch: Partial<typeof p>) =>
-    onChange({ ...state, provocation: { ...p, ...patch } });
-
-  return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <FieldLabel>Real-life Scenario</FieldLabel>
-        <TextArea
-          value={p.real_life_scenario}
-          onChange={(v) => set({ real_life_scenario: v })}
-          placeholder="A relatable scenario that motivates the topic..."
-        />
-      </div>
-      <div className="space-y-1">
-        <FieldLabel>Curiosity Hook</FieldLabel>
-        <TextArea
-          value={p.curiosity_hook}
-          onChange={(v) => set({ curiosity_hook: v })}
-          placeholder="An intriguing observation or question..."
-          rows={2}
-        />
-      </div>
-      <div className="space-y-1">
-        <FieldLabel>Motivating Question</FieldLabel>
-        <TextArea
-          value={p.motivating_question}
-          onChange={(v) => set({ motivating_question: v })}
-          placeholder="The driving question for the investigation..."
-          rows={2}
-        />
-      </div>
-      <ScaffoldingLevelPicker
-        value={p.scaffolding_level}
-        onChange={(v) => set({ scaffolding_level: v })}
-      />
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Step 7: NCL                                                        */
-/* ------------------------------------------------------------------ */
-
-export function StepNcl({
-  state,
-  onChange,
-}: {
-  state: WizardState;
-  onChange: (s: WizardState) => void;
-}) {
-  const n = state.ncl;
-  const set = (patch: Partial<typeof n>) =>
-    onChange({ ...state, ncl: { ...n, ...patch } });
-
-  const updateKeyTerm = (i: number, patch: Partial<KeyTerm>) =>
-    set({
-      key_terms: n.key_terms.map((kt, idx) =>
-        idx === i ? { ...kt, ...patch } : kt,
-      ),
-    });
-
-  return (
-    <div className="space-y-4">
-      <StringListEditor
-        label="Concepts Required"
-        hint="at least 1"
-        items={n.concepts_required}
-        onChange={(v) => set({ concepts_required: v })}
-        placeholder="e.g. Pressure: the effect of force on an area."
-      />
-
-      <div className="space-y-2">
-        <FieldLabel hint="at least 1">Key Terms</FieldLabel>
-        {n.key_terms.map((kt, i) => (
-          <div key={i} className="flex gap-2">
-            <TextInput
-              value={kt.term}
-              onChange={(v) => updateKeyTerm(i, { term: v })}
-              placeholder="Term"
-            />
-            <TextInput
-              value={kt.definition}
-              onChange={(v) => updateKeyTerm(i, { definition: v })}
-              placeholder="Definition"
-            />
-            {n.key_terms.length > 1 && (
-              <button
-                type="button"
-                onClick={() =>
-                  set({
-                    key_terms: n.key_terms.filter((_, idx) => idx !== i),
-                  })
-                }
-                className="text-red-500 hover:text-red-700 text-xs px-2 transition shrink-0"
-              >
-                ✕
-              </button>
-            )}
-          </div>
         ))}
         <button
           type="button"
-          onClick={() =>
-            set({ key_terms: [...n.key_terms, { term: "", definition: "" }] })
-          }
-          className="text-sm text-accent hover:text-accent-strong transition"
+          onClick={addVariable}
+          className="w-full py-3 text-sm rounded-md border border-dashed border-surface-border text-text-muted hover:border-accent hover:text-accent transition"
         >
-          + Add term
+          + Add variable
         </button>
-      </div>
+      </Section>
 
-      <ScaffoldingLevelPicker
-        value={n.scaffolding_level}
-        onChange={(v) => set({ scaffolding_level: v })}
-      />
+      {/* Rules */}
+      <Section
+        title="Computation Rules"
+        description="How the engine calculates outputs from inputs"
+      >
+        {state.rules.map((rule, i) => (
+          <div
+            key={i}
+            className="rounded-lg border border-surface-border p-4 space-y-2"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-sm text-accent">{rule.id}</span>
+              <button
+                type="button"
+                onClick={() => removeRule(i)}
+                className="text-red-500 hover:text-red-700 text-xs transition"
+              >
+                Remove
+              </button>
+            </div>
+            {rule.expression && (
+              <div className="font-mono text-sm bg-surface-muted rounded px-3 py-2">
+                {rule.expression}
+              </div>
+            )}
+            {rule.decision_table_ref && (
+              <div className="text-sm text-text-muted">
+                Decision table:{" "}
+                <span className="font-mono">{rule.decision_table_ref}</span>
+              </div>
+            )}
+            <div className="space-y-1">
+              <FieldLabel hint="what this rule computes">Description</FieldLabel>
+              <TextInput
+                value={rule.description}
+                onChange={(v) => updateRule(i, { description: v })}
+                placeholder="Description"
+              />
+            </div>
+            <div className="space-y-1">
+              <FieldLabel hint="citation or SME note">Validated By</FieldLabel>
+              <TextInput
+                value={rule.validated_by}
+                onChange={(v) => updateRule(i, { validated_by: v })}
+                placeholder="e.g. NCERT Class 8, Ch 11"
+              />
+            </div>
+          </div>
+        ))}
+
+        {showPicker ? (
+          <div className="rounded-lg border-2 border-accent/30 p-4">
+            <FormulaPatternPicker
+              variables={state.variables}
+              onComplete={addRuleFromPattern}
+              onCancel={() => setShowPicker(false)}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowPicker(true)}
+            className="w-full py-3 text-sm rounded-md border border-dashed border-surface-border text-text-muted hover:border-accent hover:text-accent transition"
+          >
+            + Add rule via formula picker
+          </button>
+        )}
+
+        <RawExpressionInput onAdd={addRawRule} existingIds={existingRuleIds} />
+      </Section>
+
+      {/* Decision Tables */}
+      <Section
+        title="Decision Tables"
+        description="Map categorical/boolean inputs to outputs"
+        defaultOpen={state.decision_tables.length > 0}
+      >
+        {state.decision_tables.map((table, i) => (
+          <div
+            key={i}
+            className="rounded-lg border border-surface-border p-4 space-y-2"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-sm text-accent">{table.id}</span>
+              <button
+                type="button"
+                onClick={() => removeTable(i)}
+                className="text-red-500 hover:text-red-700 text-xs transition"
+              >
+                Remove
+              </button>
+            </div>
+            <div className="text-sm text-text-muted">
+              Inputs: {table.inputs.join(", ")} &rarr; Output: {table.output}
+            </div>
+            <div className="text-sm text-text-muted">
+              {table.rows.length} row{table.rows.length !== 1 ? "s" : ""}
+              {table.default !== undefined && `, default: ${table.default}`}
+            </div>
+          </div>
+        ))}
+
+        {showBuilder ? (
+          <div className="rounded-lg border-2 border-accent/30 p-4">
+            <DecisionTableBuilder
+              variables={state.variables}
+              onComplete={addTableFromBuilder}
+              onCancel={() => setShowBuilder(false)}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowBuilder(true)}
+            className="w-full py-3 text-sm rounded-md border border-dashed border-surface-border text-text-muted hover:border-accent hover:text-accent transition"
+          >
+            + Add decision table
+          </button>
+        )}
+      </Section>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Step 8: Investigation                                              */
-/* ------------------------------------------------------------------ */
+/* ================================================================== */
+/*  Step 3: Lab Phases (Provocation → NCL → Investigation →           */
+/*          Analysis → Discussion → Reflection)                        */
+/* ================================================================== */
 
 function ExperimentEditor({
   experiment,
@@ -1077,9 +940,7 @@ function ExperimentEditor({
               type="button"
               onClick={() =>
                 onItemsChange(
-                  active
-                    ? items.filter((x) => x !== id)
-                    : [...items, id],
+                  active ? items.filter((x) => x !== id) : [...items, id],
                 )
               }
               className={cn(
@@ -1180,22 +1041,45 @@ function ExperimentEditor({
   );
 }
 
-export function StepInvestigation({
+export function StepPhases({
   state,
   onChange,
 }: {
   state: WizardState;
   onChange: (s: WizardState) => void;
 }) {
+  const p = state.provocation;
+  const n = state.ncl;
   const inv = state.investigation;
-  const set = (patch: Partial<typeof inv>) =>
+  const a = state.analysis;
+  const d = state.discussion;
+  const r = state.reflection;
+
+  const setP = (patch: Partial<typeof p>) =>
+    onChange({ ...state, provocation: { ...p, ...patch } });
+  const setN = (patch: Partial<typeof n>) =>
+    onChange({ ...state, ncl: { ...n, ...patch } });
+  const setInv = (patch: Partial<typeof inv>) =>
     onChange({ ...state, investigation: { ...inv, ...patch } });
+  const setA = (patch: Partial<typeof a>) =>
+    onChange({ ...state, analysis: { ...a, ...patch } });
+  const setD = (patch: Partial<typeof d>) =>
+    onChange({ ...state, discussion: { ...d, ...patch } });
+  const setR = (patch: Partial<typeof r>) =>
+    onChange({ ...state, reflection: { ...r, ...patch } });
 
   const varIds = state.variables.map((v) => v.id);
-  const ruleIds = state.rules.map((r) => r.id);
+  const ruleIds = state.rules.map((ru) => ru.id);
+
+  const updateKeyTerm = (i: number, patch: Partial<KeyTerm>) =>
+    setN({
+      key_terms: n.key_terms.map((kt, idx) =>
+        idx === i ? { ...kt, ...patch } : kt,
+      ),
+    });
 
   const addExperiment = () => {
-    set({
+    setInv({
       experiments: [
         ...inv.experiments,
         {
@@ -1210,230 +1094,286 @@ export function StepInvestigation({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <FieldLabel>Orientation Prompt</FieldLabel>
-        <TextArea
-          value={inv.orientation_prompt}
-          onChange={(v) => set({ orientation_prompt: v })}
-          placeholder="Describe the setup the student will work with..."
-        />
-      </div>
-      <StringListEditor
-        label="Questioning Prompts"
-        hint="at least 1"
-        items={inv.questioning_prompts}
-        onChange={(v) => set({ questioning_prompts: v })}
-        placeholder="If you increase force, what happens to pressure?"
-      />
-      <StringListEditor
-        label="Hypothesis Scaffolds"
-        hint="at least 1"
-        items={inv.hypothesis_scaffolds}
-        onChange={(v) => set({ hypothesis_scaffolds: v })}
-        placeholder="I predict that when ___, then ___."
-      />
-
-      <div className="space-y-1">
-        <FieldLabel hint="at least 1">Explorable Variables</FieldLabel>
-        <div className="flex flex-wrap gap-2">
-          {varIds.map((id) => {
-            const active = inv.explorable_variables.includes(id);
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() =>
-                  set({
-                    explorable_variables: active
-                      ? inv.explorable_variables.filter((x) => x !== id)
-                      : [...inv.explorable_variables, id],
-                  })
-                }
-                className={cn(
-                  "px-2 py-1 text-xs rounded border transition font-mono",
-                  active
-                    ? "bg-accent text-text-inverse border-accent"
-                    : "bg-surface text-text-muted border-surface-border hover:border-accent/40",
-                )}
-              >
-                {id}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Experiments */}
-      <div className="space-y-3">
-        <FieldLabel hint="at least 1">Experiments</FieldLabel>
-        {inv.experiments.map((exp, i) => (
-          <ExperimentEditor
-            key={i}
-            experiment={exp}
-            variables={state.variables}
-            ruleIds={ruleIds}
-            onChange={(updated) =>
-              set({
-                experiments: inv.experiments.map((e, idx) =>
-                  idx === i ? updated : e,
-                ),
-              })
-            }
-            onRemove={() =>
-              set({
-                experiments: inv.experiments.filter((_, idx) => idx !== i),
-              })
-            }
+    <div className="space-y-6">
+      {/* Provocation */}
+      <Section
+        title="1. Provocation"
+        description="The hook that sparks curiosity"
+      >
+        <div className="space-y-1">
+          <FieldLabel>Real-life Scenario</FieldLabel>
+          <TextArea
+            value={p.real_life_scenario}
+            onChange={(v) => setP({ real_life_scenario: v })}
+            placeholder="A relatable scenario that motivates the topic..."
           />
-        ))}
-        <button
-          type="button"
-          onClick={addExperiment}
-          className="w-full py-2 text-sm rounded-md border border-dashed border-surface-border text-text-muted hover:border-accent hover:text-accent transition"
-        >
-          + Add Experiment
-        </button>
-      </div>
-
-      <StringListEditor
-        label="Data Interpretation Prompts"
-        hint="at least 1"
-        items={inv.data_interpretation_prompts}
-        onChange={(v) => set({ data_interpretation_prompts: v })}
-        placeholder="What pattern do you see when..."
-      />
-      <ScaffoldingLevelPicker
-        value={inv.scaffolding_level}
-        onChange={(v) => set({ scaffolding_level: v })}
-      />
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Step 9: Analysis                                                   */
-/* ------------------------------------------------------------------ */
-
-export function StepAnalysis({
-  state,
-  onChange,
-}: {
-  state: WizardState;
-  onChange: (s: WizardState) => void;
-}) {
-  const a = state.analysis;
-  const set = (patch: Partial<typeof a>) =>
-    onChange({ ...state, analysis: { ...a, ...patch } });
-
-  return (
-    <div className="space-y-4">
-      <StringListEditor
-        label="Guiding Questions"
-        hint="at least 1"
-        items={a.guiding_questions}
-        onChange={(v) => set({ guiding_questions: v })}
-        placeholder="Explain in your own words why..."
-      />
-      <StringListEditor
-        label="Expected Patterns"
-        hint="at least 1; what the AI tutor checks against"
-        items={a.expected_patterns}
-        onChange={(v) => set({ expected_patterns: v })}
-        placeholder="Students should observe that..."
-      />
-      <ScaffoldingLevelPicker
-        value={a.scaffolding_level}
-        onChange={(v) => set({ scaffolding_level: v })}
-      />
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Step 10: Discussion                                                */
-/* ------------------------------------------------------------------ */
-
-export function StepDiscussion({
-  state,
-  onChange,
-}: {
-  state: WizardState;
-  onChange: (s: WizardState) => void;
-}) {
-  const d = state.discussion;
-  const set = (patch: Partial<typeof d>) =>
-    onChange({ ...state, discussion: { ...d, ...patch } });
-
-  return (
-    <div className="space-y-4">
-      <StringListEditor
-        label="Discussion Prompts"
-        hint="at least 1"
-        items={d.discussion_prompts}
-        onChange={(v) => set({ discussion_prompts: v })}
-        placeholder="Share one finding that surprised you..."
-      />
-      <div className="space-y-1">
-        <FieldLabel>Peer Interaction Type</FieldLabel>
-        <TextInput
-          value={d.peer_interaction_type}
-          onChange={(v) => set({ peer_interaction_type: v })}
-          placeholder="e.g. pair-and-share, group discussion"
+        </div>
+        <div className="space-y-1">
+          <FieldLabel>Curiosity Hook</FieldLabel>
+          <TextArea
+            value={p.curiosity_hook}
+            onChange={(v) => setP({ curiosity_hook: v })}
+            placeholder="An intriguing observation or question..."
+            rows={2}
+          />
+        </div>
+        <div className="space-y-1">
+          <FieldLabel>Motivating Question</FieldLabel>
+          <TextArea
+            value={p.motivating_question}
+            onChange={(v) => setP({ motivating_question: v })}
+            placeholder="The driving question for the investigation..."
+            rows={2}
+          />
+        </div>
+        <ScaffoldingLevelPicker
+          value={p.scaffolding_level}
+          onChange={(v) => setP({ scaffolding_level: v })}
         />
-      </div>
-      <ScaffoldingLevelPicker
-        value={d.scaffolding_level}
-        onChange={(v) => set({ scaffolding_level: v })}
-      />
+      </Section>
+
+      {/* NCL */}
+      <Section
+        title="2. Need to Know Concepts"
+        description="Concepts and vocabulary students need before they investigate"
+      >
+        <StringListEditor
+          label="Concepts Required"
+          hint="at least 1"
+          items={n.concepts_required}
+          onChange={(v) => setN({ concepts_required: v })}
+          placeholder="e.g. Pressure: the effect of force on an area."
+        />
+        <div className="space-y-2">
+          <FieldLabel hint="at least 1">Key Terms</FieldLabel>
+          {n.key_terms.map((kt, i) => (
+            <div key={i} className="flex gap-2">
+              <TextInput
+                value={kt.term}
+                onChange={(v) => updateKeyTerm(i, { term: v })}
+                placeholder="Term"
+              />
+              <TextInput
+                value={kt.definition}
+                onChange={(v) => updateKeyTerm(i, { definition: v })}
+                placeholder="Definition"
+              />
+              {n.key_terms.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setN({
+                      key_terms: n.key_terms.filter((_, idx) => idx !== i),
+                    })
+                  }
+                  className="text-red-500 hover:text-red-700 text-xs px-2 transition shrink-0"
+                >
+                  &#10005;
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setN({
+                key_terms: [...n.key_terms, { term: "", definition: "" }],
+              })
+            }
+            className="text-sm text-accent hover:text-accent-strong transition"
+          >
+            + Add term
+          </button>
+        </div>
+        <ScaffoldingLevelPicker
+          value={n.scaffolding_level}
+          onChange={(v) => setN({ scaffolding_level: v })}
+        />
+      </Section>
+
+      {/* Investigation */}
+      <Section
+        title="3. Investigation"
+        description="The hands-on experiment phase"
+      >
+        <div className="space-y-1">
+          <FieldLabel>Orientation Prompt</FieldLabel>
+          <TextArea
+            value={inv.orientation_prompt}
+            onChange={(v) => setInv({ orientation_prompt: v })}
+            placeholder="Describe the setup the student will work with..."
+          />
+        </div>
+        <StringListEditor
+          label="Questioning Prompts"
+          hint="at least 1"
+          items={inv.questioning_prompts}
+          onChange={(v) => setInv({ questioning_prompts: v })}
+          placeholder="If you increase force, what happens to pressure?"
+        />
+        <StringListEditor
+          label="Hypothesis Scaffolds"
+          hint="at least 1"
+          items={inv.hypothesis_scaffolds}
+          onChange={(v) => setInv({ hypothesis_scaffolds: v })}
+          placeholder="I predict that when ___, then ___."
+        />
+        <div className="space-y-1">
+          <FieldLabel hint="at least 1">Explorable Variables</FieldLabel>
+          <div className="flex flex-wrap gap-2">
+            {varIds.map((id) => {
+              const active = inv.explorable_variables.includes(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() =>
+                    setInv({
+                      explorable_variables: active
+                        ? inv.explorable_variables.filter((x) => x !== id)
+                        : [...inv.explorable_variables, id],
+                    })
+                  }
+                  className={cn(
+                    "px-2 py-1 text-xs rounded border transition font-mono",
+                    active
+                      ? "bg-accent text-text-inverse border-accent"
+                      : "bg-surface text-text-muted border-surface-border hover:border-accent/40",
+                  )}
+                >
+                  {id}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="space-y-3">
+          <FieldLabel hint="at least 1">Experiments</FieldLabel>
+          {inv.experiments.map((exp, i) => (
+            <ExperimentEditor
+              key={i}
+              experiment={exp}
+              variables={state.variables}
+              ruleIds={ruleIds}
+              onChange={(updated) =>
+                setInv({
+                  experiments: inv.experiments.map((e, idx) =>
+                    idx === i ? updated : e,
+                  ),
+                })
+              }
+              onRemove={() =>
+                setInv({
+                  experiments: inv.experiments.filter((_, idx) => idx !== i),
+                })
+              }
+            />
+          ))}
+          <button
+            type="button"
+            onClick={addExperiment}
+            className="w-full py-2 text-sm rounded-md border border-dashed border-surface-border text-text-muted hover:border-accent hover:text-accent transition"
+          >
+            + Add experiment
+          </button>
+        </div>
+        <StringListEditor
+          label="Data Interpretation Prompts"
+          hint="at least 1"
+          items={inv.data_interpretation_prompts}
+          onChange={(v) => setInv({ data_interpretation_prompts: v })}
+          placeholder="What pattern do you see when..."
+        />
+        <ScaffoldingLevelPicker
+          value={inv.scaffolding_level}
+          onChange={(v) => setInv({ scaffolding_level: v })}
+        />
+      </Section>
+
+      {/* Analysis */}
+      <Section
+        title="4. Analysis"
+        description="Guiding students to interpret their results"
+      >
+        <StringListEditor
+          label="Guiding Questions"
+          hint="at least 1"
+          items={a.guiding_questions}
+          onChange={(v) => setA({ guiding_questions: v })}
+          placeholder="Explain in your own words why..."
+        />
+        <StringListEditor
+          label="Expected Patterns"
+          hint="at least 1"
+          items={a.expected_patterns}
+          onChange={(v) => setA({ expected_patterns: v })}
+          placeholder="Students should observe that..."
+        />
+        <ScaffoldingLevelPicker
+          value={a.scaffolding_level}
+          onChange={(v) => setA({ scaffolding_level: v })}
+        />
+      </Section>
+
+      {/* Discussion */}
+      <Section
+        title="5. Discussion"
+        description="Peer interaction and sharing findings"
+      >
+        <StringListEditor
+          label="Discussion Prompts"
+          hint="at least 1"
+          items={d.discussion_prompts}
+          onChange={(v) => setD({ discussion_prompts: v })}
+          placeholder="Share one finding that surprised you..."
+        />
+        <div className="space-y-1">
+          <FieldLabel>Peer Interaction Type</FieldLabel>
+          <TextInput
+            value={d.peer_interaction_type}
+            onChange={(v) => setD({ peer_interaction_type: v })}
+            placeholder="e.g. pair-and-share, group discussion"
+          />
+        </div>
+        <ScaffoldingLevelPicker
+          value={d.scaffolding_level}
+          onChange={(v) => setD({ scaffolding_level: v })}
+        />
+      </Section>
+
+      {/* Reflection */}
+      <Section
+        title="6. Reflection"
+        description="Helping students think about their learning"
+      >
+        <StringListEditor
+          label="Reflection Prompts"
+          hint="at least 1"
+          items={r.reflection_prompts}
+          onChange={(v) => setR({ reflection_prompts: v })}
+          placeholder="What is one thing you understand now that you didn't before?"
+        />
+        <StringListEditor
+          label="Metacognitive Prompts"
+          hint="at least 1"
+          items={r.metacognitive_prompts}
+          onChange={(v) => setR({ metacognitive_prompts: v })}
+          placeholder="When did you realise your prediction was wrong?"
+        />
+        <ScaffoldingLevelPicker
+          value={r.scaffolding_level}
+          onChange={(v) => setR({ scaffolding_level: v })}
+        />
+      </Section>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Step 11: Reflection                                                */
-/* ------------------------------------------------------------------ */
+/* ================================================================== */
+/*  Step 4: AI Tutor & Assessment                                      */
+/* ================================================================== */
 
-export function StepReflection({
-  state,
-  onChange,
-}: {
-  state: WizardState;
-  onChange: (s: WizardState) => void;
-}) {
-  const r = state.reflection;
-  const set = (patch: Partial<typeof r>) =>
-    onChange({ ...state, reflection: { ...r, ...patch } });
-
-  return (
-    <div className="space-y-4">
-      <StringListEditor
-        label="Reflection Prompts"
-        hint="at least 1"
-        items={r.reflection_prompts}
-        onChange={(v) => set({ reflection_prompts: v })}
-        placeholder="What is one thing you understand now that you didn't before?"
-      />
-      <StringListEditor
-        label="Metacognitive Prompts"
-        hint="at least 1"
-        items={r.metacognitive_prompts}
-        onChange={(v) => set({ metacognitive_prompts: v })}
-        placeholder="When did you realise your prediction was wrong?"
-      />
-      <ScaffoldingLevelPicker
-        value={r.scaffolding_level}
-        onChange={(v) => set({ scaffolding_level: v })}
-      />
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Step 12: Assessment & AI Tutor Config                              */
-/* ------------------------------------------------------------------ */
-
-export function StepAssessment({
+export function StepTutor({
   state,
   onChange,
 }: {
@@ -1470,15 +1410,94 @@ export function StepAssessment({
 
   return (
     <div className="space-y-6">
-      {/* Assessment rubric */}
-      <div>
-        <h3 className="text-sm font-semibold text-text mb-3">
-          Assessment Rubric
-        </h3>
+      <Section
+        title="AI Tutor Configuration"
+        description="What the AI tutor is allowed and forbidden to do"
+      >
+        <div className="space-y-1">
+          <FieldLabel>Allowed Actions</FieldLabel>
+          <p className="text-xs text-text-muted mb-2">
+            Select what the tutor may do to help students.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {allAllowed.map((action) => {
+              const active = tutor.allowed_actions.includes(action);
+              return (
+                <button
+                  key={action}
+                  type="button"
+                  onClick={() =>
+                    setTutor({
+                      allowed_actions: active
+                        ? tutor.allowed_actions.filter((a) => a !== action)
+                        : [...tutor.allowed_actions, action],
+                    })
+                  }
+                  className={cn(
+                    "px-3 py-1.5 text-xs rounded-md border transition",
+                    active
+                      ? "bg-green-100 text-green-800 border-green-300"
+                      : "bg-surface text-text-muted border-surface-border hover:border-green-300",
+                  )}
+                >
+                  {action.replace(/_/g, " ")}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <FieldLabel>Forbidden Actions</FieldLabel>
+          <p className="text-xs text-text-muted mb-2">
+            The tutor will never do these, even if a student asks.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {allForbidden.map((action) => {
+              const active = tutor.forbidden_actions.includes(action);
+              return (
+                <button
+                  key={action}
+                  type="button"
+                  onClick={() =>
+                    setTutor({
+                      forbidden_actions: active
+                        ? tutor.forbidden_actions.filter((a) => a !== action)
+                        : [...tutor.forbidden_actions, action],
+                    })
+                  }
+                  className={cn(
+                    "px-3 py-1.5 text-xs rounded-md border transition",
+                    active
+                      ? "bg-red-100 text-red-800 border-red-300"
+                      : "bg-surface text-text-muted border-surface-border hover:border-red-300",
+                  )}
+                >
+                  {action.replace(/_/g, " ")}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <FieldLabel>Fallback When Asked Science</FieldLabel>
+          <TextArea
+            value={tutor.fallback_when_asked_science}
+            onChange={(v) => setTutor({ fallback_when_asked_science: v })}
+            placeholder="I'm not the source of the science -- the engine is. Try the calculation..."
+          />
+        </div>
+      </Section>
+
+      <Section
+        title="Assessment Rubric"
+        description="How to evaluate student performance"
+      >
         {assess.rubric.map((c, i) => (
           <div
             key={i}
-            className="rounded-lg border border-surface-border p-4 space-y-2 mb-3"
+            className="rounded-lg border border-surface-border p-4 space-y-2"
           >
             <div className="flex items-center justify-between">
               <FieldLabel>Criterion {i + 1}</FieldLabel>
@@ -1524,95 +1543,20 @@ export function StepAssessment({
         >
           + Add criterion
         </button>
-      </div>
+      </Section>
 
-      <StringListEditor
-        label="Formative Checks"
-        hint="at least 1"
-        items={assess.formative_checks}
-        onChange={(v) => setAssess({ formative_checks: v })}
-        placeholder="Predict the value BEFORE running the engine"
-      />
-
-      {/* AI Tutor Config */}
-      <div>
-        <h3 className="text-sm font-semibold text-text mb-3">
-          AI Tutor Configuration
-        </h3>
-
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <FieldLabel>Allowed Actions</FieldLabel>
-            <div className="flex flex-wrap gap-2">
-              {allAllowed.map((action) => {
-                const active = tutor.allowed_actions.includes(action);
-                return (
-                  <button
-                    key={action}
-                    type="button"
-                    onClick={() =>
-                      setTutor({
-                        allowed_actions: active
-                          ? tutor.allowed_actions.filter((a) => a !== action)
-                          : [...tutor.allowed_actions, action],
-                      })
-                    }
-                    className={cn(
-                      "px-3 py-1.5 text-xs rounded-md border transition",
-                      active
-                        ? "bg-green-100 text-green-800 border-green-300"
-                        : "bg-surface text-text-muted border-surface-border hover:border-green-300",
-                    )}
-                  >
-                    {action.replace(/_/g, " ")}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <FieldLabel>Forbidden Actions</FieldLabel>
-            <div className="flex flex-wrap gap-2">
-              {allForbidden.map((action) => {
-                const active = tutor.forbidden_actions.includes(action);
-                return (
-                  <button
-                    key={action}
-                    type="button"
-                    onClick={() =>
-                      setTutor({
-                        forbidden_actions: active
-                          ? tutor.forbidden_actions.filter((a) => a !== action)
-                          : [...tutor.forbidden_actions, action],
-                      })
-                    }
-                    className={cn(
-                      "px-3 py-1.5 text-xs rounded-md border transition",
-                      active
-                        ? "bg-red-100 text-red-800 border-red-300"
-                        : "bg-surface text-text-muted border-surface-border hover:border-red-300",
-                    )}
-                  >
-                    {action.replace(/_/g, " ")}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <FieldLabel>
-              Fallback When Asked Science
-            </FieldLabel>
-            <TextArea
-              value={tutor.fallback_when_asked_science}
-              onChange={(v) => setTutor({ fallback_when_asked_science: v })}
-              placeholder="I'm not the source of the science — the engine is. Try the calculation..."
-            />
-          </div>
-        </div>
-      </div>
+      <Section
+        title="Formative Checks"
+        description="Quick checks during the lab"
+      >
+        <StringListEditor
+          label="Formative Checks"
+          hint="at least 1"
+          items={assess.formative_checks}
+          onChange={(v) => setAssess({ formative_checks: v })}
+          placeholder="Predict the value BEFORE running the engine"
+        />
+      </Section>
     </div>
   );
 }
