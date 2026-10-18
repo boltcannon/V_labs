@@ -171,7 +171,7 @@ function ActiveStep({
 }) {
   switch (stepId) {
     case "about":
-      return <StepAbout state={state} onChange={onChange} />;
+      return <StepAbout state={state} onChange={onChange} fromTemplate={fromTemplate} />;
     case "science":
       return (
         <StepScience
@@ -456,6 +456,26 @@ export function WizardShell() {
             <h1 className="text-xl font-semibold text-text">
               {activeStep.label}
             </h1>
+            {activeStep.id === "about" && (
+              <p className="text-sm text-text-muted mt-1">
+                Name your lab and set the class, subject, and learning outcomes.
+              </p>
+            )}
+            {activeStep.id === "science" && !fromTemplate && (
+              <p className="text-sm text-text-muted mt-1">
+                Define variables, formulas, and decision tables that power the simulation.
+              </p>
+            )}
+            {activeStep.id === "phases" && (
+              <p className="text-sm text-text-muted mt-1">
+                Write the prompts students see in each phase of the lab.
+              </p>
+            )}
+            {activeStep.id === "tutor" && (
+              <p className="text-sm text-text-muted mt-1">
+                Configure what the AI tutor can and cannot do, and set the assessment rubric.
+              </p>
+            )}
           </div>
 
           {isReview ? (

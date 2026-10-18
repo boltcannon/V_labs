@@ -1,6 +1,7 @@
 import { listLabSummaries } from "@/app/lib/list-lab-specs";
 import { LabPickerCard } from "@/components/lab-picker-card";
-import { Beaker } from "lucide-react";
+import { Beaker, PenLine } from "lucide-react";
+import Link from "next/link";
 
 export default function RootPage() {
   const labs = listLabSummaries();
@@ -26,6 +27,13 @@ export default function RootPage() {
             AI-scaffolded inquiry labs for Indian school classrooms.
             Choose a lab to begin your investigation.
           </p>
+          <Link
+            href="/author"
+            className="inline-flex items-center gap-2 mt-6 px-5 py-2.5 rounded-lg bg-white/15 backdrop-blur-sm text-sm font-medium text-white hover:bg-white/25 transition"
+          >
+            <PenLine className="w-4 h-4" />
+            Create a lab
+          </Link>
         </div>
       </div>
 

@@ -239,9 +239,11 @@ function Section({
 export function StepAbout({
   state,
   onChange,
+  fromTemplate = false,
 }: {
   state: WizardState;
   onChange: (s: WizardState) => void;
+  fromTemplate?: boolean;
 }) {
   const m = state.meta;
   const ca = state.curriculum_alignment;
@@ -252,6 +254,15 @@ export function StepAbout({
 
   return (
     <div className="space-y-6">
+      {fromTemplate && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+          <p className="text-sm text-blue-800">
+            This lab is based on a template. Give it a new topic name and
+            update any details for your classroom. The class, subject, and
+            curriculum alignment are pre-filled but you can change them.
+          </p>
+        </div>
+      )}
       <Section title="Basic Information" description="What is this lab about?">
         <div className="space-y-1">
           <FieldLabel>Topic</FieldLabel>
