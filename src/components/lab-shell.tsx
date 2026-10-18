@@ -18,10 +18,10 @@ interface Props {
 export function LabShell({ labId, publicSpec, children }: Props) {
   return (
     <LabSessionProvider labId={labId}>
-      <div className="min-h-screen flex bg-surface-muted">
+      <div className="h-screen flex bg-surface-muted overflow-hidden">
         <PhaseNavigator labId={labId} labTopic={publicSpec.meta.topic} />
-        <main className="flex-1 min-w-0">
-          <div className="max-w-3xl mx-auto px-6 py-8">{children}</div>
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
+          {children}
         </main>
       </div>
     </LabSessionProvider>
