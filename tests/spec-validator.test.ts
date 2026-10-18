@@ -19,7 +19,7 @@ import { loadSpec, REPO_ROOT, CLASS_6_PATH, CLASS_8_PATH, CLASS_9_PATH } from ".
 import { v2Spec, brightnessSpec } from "./fixtures/v2-spec";
 
 function validate(obj: unknown, opts?: { samples?: number; seed?: number }): SpecIssue[] {
-  return validateSpec(parseLabSpec(yaml.dump(obj), "fixture"), opts);
+  return validateSpec(parseLabSpec(yaml.dump(obj), "fixture", { runSpecValidator: false }), opts);
 }
 
 const rulesOf = (issues: SpecIssue[]) => [...new Set(issues.map((i) => i.rule))].sort();
@@ -203,7 +203,7 @@ describe("V4 — the discrepancy survives every reachable configuration", () => 
     expect(point).toBeDefined();
     expect(point.r2 as number).toBeLessThan(point.r1 as number);
     // The named point is real: re-running the engine there confirms bulb 2 is dimmer.
-    const spec = parseLabSpec(yaml.dump(brightnessSpec()), "fixture");
+    const spec = parseLabSpec(yaml.dump(brightnessSpec()), "fixture", { runSpecValidator: false });
     const r = runLab(spec, point);
     expect(r.values.p2 as number).toBeLessThan(r.values.p1 as number);
     // And the message names the values so a teacher can see why.

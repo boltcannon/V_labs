@@ -19,7 +19,7 @@ and run in `tests/save-lab-spec.test.ts` and `tests/schema-v2.test.ts`.
 
 | # | Principle | Enforced in | Verified in |
 |---|-----------|-------------|-------------|
-| 1 | Deterministic truth (rule engine, never LLM) | `src/engine/rule-engine.ts` (pure function of `(spec, inputs)`, no `fetch`/`eval`/LLM); `src/engine/expression-evaluator.ts` (AST parser, `eval` forbidden; `parseCondition`/`evaluateCondition` for prediction conditions); `src/app/lib/resolve-prediction.ts` (a prediction is matched by running the engine at the experiment preset and evaluating each `correct_when` — no LLM) | `tests/engine.test.ts`; `tests/decision-table.test.ts`; `tests/electricity.test.ts` (hand-checked golden values, written before the spec); `tests/resolve-prediction.test.ts` (prediction matching) |
+| 1 | Deterministic truth (rule engine, never LLM) | `src/engine/rule-engine.ts` (pure function of `(spec, inputs)`, no `fetch`/`eval`/LLM); `src/engine/expression-evaluator.ts` (AST parser, `eval` forbidden, `random()` removed; `parseCondition`/`evaluateCondition` for prediction conditions); `src/app/lib/resolve-prediction.ts` (a prediction is matched by running the engine at the experiment preset and evaluating each `correct_when` — no LLM) | `tests/engine.test.ts`; `tests/decision-table.test.ts`; `tests/electricity.test.ts` (hand-checked golden values, written before the spec); `tests/resolve-prediction.test.ts` (prediction matching) |
 | 2 | NCERT alignment | `src/schema/lab-spec.ts` `Meta.chapter_reference`, `curriculum_alignment.learning_outcomes`; each `Rule.validated_by` | `tests/principles.test.ts` (`principle 2` block, all three worked examples); inline `# TODO(ncert-verify)` tags still open in the Class 6, 9 and 10 specs |
 | 3 | Real-life framing | `src/schema/lab-spec.ts` `Provocation.real_life_scenario` (required, non-empty) | `tests/principles.test.ts` (`principle 3` block) |
 | 4 | Full inquiry cycle (Pedaste) | `src/schema/lab-spec.ts` `Investigation` sub-fields; schema v2 `Prediction` (gate, items, options). Predict-before-run is enforced in the UI: `src/app/lib/prediction-flow.ts` (choose → commit → reveal → explain → compare → revise) and `src/components/investigation/investigation-shell.tsx` (Run and controls locked until the prediction is done) | `tests/principles.test.ts` (`principle 4` block); `tests/prediction-flow.test.ts` (run stays locked until commit, and after a mismatch until all three revision steps); `tests/spec-validator.test.ts` V7 (misconceptions require `gate: true`) |
@@ -59,6 +59,8 @@ Structural rules that keep the framework's guarantees intact.
 | V6 Choice options route to existing misconceptions; all reachable when choice points exist | `src/validator/spec-validator.ts` | `tests/spec-validator.test.ts` — V6 |
 | V7 Misconceptions require `prediction.gate: true` | `src/validator/spec-validator.ts` | `tests/spec-validator.test.ts` — V7 |
 | The Class 10 lab passes V1–V7 | `src/specs/class-10-physics-electricity.yaml` | `tests/electricity.test.ts` |
+| The loader refuses a spec that fails V1–V7 (so does the wizard's save action, which validates through the same `parseLabSpec`) | `src/loader/spec-loader.ts` `parseLabSpec` | `tests/hardening.test.ts` — "loader — runs the spec validator" |
+| No `random()` in expressions — the engine never yields a non-deterministic value | `src/engine/expression-evaluator.ts` (removed from the parser's function table) | `tests/hardening.test.ts` — "random() is not available" |
 
 ### Prediction gate (runtime)
 
@@ -73,9 +75,9 @@ Structural rules that keep the framework's guarantees intact.
 
 Honest gaps, so the table above is not read as more than it is.
 
-- **The validator is not wired in.** Neither the loader nor the authoring wizard's save action calls `validateSpec`; V1–V7 are enforced only by tests over the shipped specs.
 - **Tutor guardrails are prompt-level only.** No post-hoc response validator; evidence is the three live tests in `docs/tutor-behaviour-log.md`.
-- **`random()` is available to expressions.** expr-eval's `random` function is not disabled in the parser, so a rule or `correct_when` could be non-deterministic. No shipped spec uses it.
+- **Undeclared names in rule expressions are not rejected at load.** A rule whose right-hand side uses an unknown identifier loads, and fails only when the engine evaluates it. (Prediction conditions are checked: V2 rejects unknown variables.)
+- **expr-eval's `if(…)` function is still available,** so a rule can branch even though the `?:` operator is disabled. Not a determinism risk; a design-intent gap.
 - **The model-reveal check is stateless.** The server cannot confirm the student actually chose the option or completed the earlier revision steps; it requires only a non-blank revision.
 - **Prediction and revision answers are not stored or logged.** They are lost on navigation and are not seen by the tutor or a teacher.
 - **Not rendered yet:** choice points, and the `sort` and `numeric` prediction modes.

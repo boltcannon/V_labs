@@ -153,7 +153,7 @@ describe("electricity — spec structure", () => {
     m1Options[0]!.correct_when = "p2 < p1"; // "less after the bulb" → "bulb 2 dimmer"
     m1Options[1]!.correct_when = "p2 == p1";
     m1Options[2]!.correct_when = "p2 > p1";
-    const issues = validateSpec(parseLabSpec(yaml.dump(raw), "brightness-variant"));
+    const issues = validateSpec(parseLabSpec(yaml.dump(raw), "brightness-variant", { runSpecValidator: false }));
     expect(issues.map((i) => i.rule)).toEqual(["V4"]);
   });
 });

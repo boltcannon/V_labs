@@ -42,6 +42,14 @@ const parser = new Parser({
   },
 });
 
+// expr-eval ships a `random()` function. It is a function, not an
+// operator, so the `operators` options above cannot switch it off — it
+// has to be removed from the function table. Without it, `random` is just
+// an unknown name: a rule using it fails to evaluate and a prediction
+// condition using it fails validator V2. Principle 1: the engine never
+// produces a non-deterministic value.
+delete (parser.functions as Record<string, unknown>).random;
+
 /** Result of parsing a full rule expression. Cached per rule. */
 export interface ParsedExpression {
   /** LHS: the target variable id. */
