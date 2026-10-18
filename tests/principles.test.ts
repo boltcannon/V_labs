@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { loadSpec, CLASS_6_PATH, CLASS_9_PATH } from "./helpers";
+import { loadSpec, CLASS_6_PATH, CLASS_9_PATH, CLASS_10_PATH } from "./helpers";
 
 /**
  * Meta-tests: assert that every worked example carries the pedagogical
@@ -8,7 +8,7 @@ import { loadSpec, CLASS_6_PATH, CLASS_9_PATH } from "./helpers";
  * principle so the teacher knows what to add.
  */
 
-const SPEC_PATHS = [CLASS_6_PATH, CLASS_9_PATH];
+const SPEC_PATHS = [CLASS_6_PATH, CLASS_9_PATH, CLASS_10_PATH];
 
 for (const rel of SPEC_PATHS) {
   const spec = loadSpec(rel);

@@ -1,0 +1,379 @@
+# =====================================================================
+# Class 10 · Physics · Electricity — "Where does the current go?"
+# ---------------------------------------------------------------------
+# NCERT alignment: Class 10 Science, chapter "Electricity" (series
+# circuits, current, potential difference, resistance).
+#
+# Rationale for this example:
+#   The first schema-v2 lab. It adds a prediction gate, two research-
+#   documented misconceptions with discrepant events, and a choice point
+#   — all on the unchanged rule engine (expressions only, no new engine
+#   code). Variable ids are lowercase snake_case (CLAUDE.md §9).
+#
+#   M1 is asked about CURRENT, not brightness: the ammeter after bulb 1
+#   equals the ammeter before it for every r1, r2, so the event stays
+#   discrepant across the whole range (validator V4). A brightness
+#   version breaks as soon as r1 ≠ r2 — see tests/electricity.test.ts.
+#
+#   M2 needs "one bulb" and "two bulbs" side by side. Following the
+#   Class 9 motion spec (two legs in one run), a single engine run
+#   computes both: i_single (bulb 1 alone) and i_series (bulb 1 + bulb 2).
+# =====================================================================
+
+meta:
+  topic: "Where does the current go? (Series circuits)"
+  ncert_class: 10
+  subject: physics
+  chapter_reference: "NCERT Science Class 10, Chapter: Electricity"  # TODO(ncert-verify) chapter number and section for series circuits
+  estimated_duration_minutes: 35
+  authors:
+    - "Umang Gupta (M.Tech, IIT Bombay)"
+  spec_version: "0.2.0"
+
+curriculum_alignment:
+  learning_outcomes:
+    - "Explains the relationship between potential difference, current and resistance in a circuit."  # TODO(ncert-verify)
+    - "Applies the idea that the same current flows through every part of a series circuit."  # TODO(ncert-verify)
+    - "Predicts how adding a resistor in series changes the current drawn from the battery."  # TODO(ncert-verify)
+  prior_knowledge_assumed:
+    - "Knows the circuit symbols for a cell, a bulb, an ammeter and connecting wires."
+    - "Knows that an ammeter measures current, in amperes (A)."
+    - "Knows that a bulb glows when current flows through it."
+
+science_model:
+  variables:
+    - id: v
+      label: "Battery voltage"
+      type: number
+      unit: "V"
+      range: [1.5, 12]
+      role: input
+
+    - id: r1
+      label: "Bulb 1 resistance"
+      type: number
+      unit: "Ω"
+      range: [5, 50]
+      role: input
+
+    - id: r2
+      label: "Bulb 2 resistance"
+      type: number
+      unit: "Ω"
+      range: [5, 50]
+      role: input
+
+    - id: r_series
+      label: "Total resistance (both bulbs)"
+      type: number
+      unit: "Ω"
+      range: [10, 100]
+      role: derived
+
+    - id: i_single
+      label: "Battery current, bulb 1 alone"
+      type: number
+      unit: "A"
+      range: [0, 3]
+      role: output
+
+    - id: i_series
+      label: "Battery current, both bulbs"
+      type: number
+      unit: "A"
+      range: [0, 3]
+      role: output
+
+    - id: i_before_bulb1
+      label: "Ammeter reading before bulb 1"
+      type: number
+      unit: "A"
+      range: [0, 3]
+      role: output
+
+    - id: i_after_bulb1
+      label: "Ammeter reading after bulb 1"
+      type: number
+      unit: "A"
+      range: [0, 3]
+      role: output
+
+    - id: v1
+      label: "Voltage across bulb 1"
+      type: number
+      unit: "V"
+      range: [0, 12]
+      role: output
+
+    - id: v2
+      label: "Voltage across bulb 2"
+      type: number
+      unit: "V"
+      range: [0, 12]
+      role: output
+
+    - id: p1
+      label: "Power in bulb 1 (brightness)"
+      type: number
+      unit: "W"
+      range: [0, 10]
+      role: output
+
+    - id: p2
+      label: "Power in bulb 2 (brightness)"
+      type: number
+      unit: "W"
+      range: [0, 10]
+      role: output
+
+  rules:
+    - id: total_resistance
+      description: "Resistances in series add."
+      expression: "r_series = r1 + r2"
+      validated_by: "NCERT Class 10 Science, Electricity — resistors in series."  # TODO(ncert-verify)
+
+    - id: current_single_bulb
+      description: "Current through one bulb alone, from Ohm's law."
+      expression: "i_single = v / r1"
+      validated_by: "NCERT Class 10 Science, Electricity — Ohm's law."  # TODO(ncert-verify)
+
+    - id: current_series
+      description: "Current from the battery with both bulbs in series."
+      expression: "i_series = v / (r1 + r2)"
+      validated_by: "NCERT Class 10 Science, Electricity — Ohm's law and resistors in series."  # TODO(ncert-verify)
+
+    - id: current_before_bulb1
+      description: "The ammeter before bulb 1 reads the series current."
+      expression: "i_before_bulb1 = i_series"
+      validated_by: "NCERT Class 10 Science, Electricity — current in a series circuit."  # TODO(ncert-verify)
+
+    - id: current_after_bulb1
+      description: "The ammeter after bulb 1 reads the series current."
+      expression: "i_after_bulb1 = i_series"
+      validated_by: "NCERT Class 10 Science, Electricity — current in a series circuit."  # TODO(ncert-verify)
+
+    - id: voltage_bulb1
+      description: "Potential difference across bulb 1."
+      expression: "v1 = i_series * r1"
+      validated_by: "NCERT Class 10 Science, Electricity — Ohm's law."  # TODO(ncert-verify)
+
+    - id: voltage_bulb2
+      description: "Potential difference across bulb 2."
+      expression: "v2 = i_series * r2"
+      validated_by: "NCERT Class 10 Science, Electricity — Ohm's law."  # TODO(ncert-verify)
+
+    - id: power_bulb1
+      description: "Power dissipated in bulb 1."
+      expression: "p1 = i_series^2 * r1"
+      validated_by: "NCERT Class 10 Science, Electricity — electric power."  # TODO(ncert-verify)
+
+    - id: power_bulb2
+      description: "Power dissipated in bulb 2."
+      expression: "p2 = i_series^2 * r2"
+      validated_by: "NCERT Class 10 Science, Electricity — electric power."  # TODO(ncert-verify)
+
+  validity_bounds:
+    - "Ideal wires and battery (no internal resistance)"
+    - "Bulb resistance treated as constant"
+
+provocation:
+  real_life_scenario: >
+    You connect a bulb to a battery and it glows. Your friend says: "The
+    bulb uses up some of the current to make light, so less current comes
+    out of the bulb than goes in." Another friend says: "If we add a
+    second bulb, the battery will still push out the same current as
+    before." Are your friends right?
+  curiosity_hook: >
+    Put one ammeter just before a glowing bulb and another just after it.
+    Will the two ammeters agree?
+  motivating_question: "Where does the current go when it passes through a bulb?"
+  scaffolding_level: high
+
+ncl:
+  concepts_required:
+    - "Electric current: the rate of flow of charge, measured in amperes (A)."
+    - "Potential difference: what the battery provides to push charge round the circuit, measured in volts (V)."
+    - "Resistance: how strongly a component opposes current, measured in ohms (Ω)."
+    - "Series circuit: components connected one after another in a single loop."
+  key_terms:
+    - term: "Ammeter"
+      definition: "An instrument that measures the current at the point where it is connected."
+    - term: "Series"
+      definition: "Connected end to end, so there is only one path for the current."
+    - term: "Resistance"
+      definition: "The opposition a component offers to the flow of current, measured in ohms (Ω)."
+  scaffolding_level: high
+
+investigation:
+  orientation_prompt: >
+    You have a battery, two bulbs connected in series, and two ammeters —
+    one just before bulb 1 and one just after it. You can change the
+    battery voltage and each bulb's resistance. Before you run an
+    experiment you will commit a prediction; the lab's engine then
+    computes the readings.
+  questioning_prompts:
+    - "What do you think happens to the current inside a bulb?"
+    - "If a bulb changes something as current passes through it, what is it changing?"
+    - "When you add a second bulb, what changes for the battery?"
+  hypothesis_scaffolds:
+    - "I think the ammeter after bulb 1 will read ___ the ammeter before it, because ___."
+    - "If I add a second bulb, I think the battery current will ___, because ___."
+  explorable_variables: [v, r1, r2]
+  experiments:
+    - id: exp_series_current
+      goal: "Compare the ammeter readings just before and just after bulb 1."
+      controlled_vars: [v]
+      manipulated_vars: [r1, r2]
+      measured_vars: [i_before_bulb1, i_after_bulb1]
+      exercises_rules: [total_resistance, current_series, current_before_bulb1, current_after_bulb1]
+      preset: { v: 6, r1: 10, r2: 10 }
+    - id: exp_add_bulb
+      goal: "Compare the battery current with bulb 1 alone and with a second bulb added in series."
+      controlled_vars: [v, r1]
+      manipulated_vars: [r2]
+      measured_vars: [i_single, i_series]
+      exercises_rules: [current_single_bulb, current_series]
+      preset: { v: 6, r1: 10, r2: 10 }
+  data_interpretation_prompts:
+    - "Compare the two ammeter readings in every run you made. What do you notice?"
+    - "How did the battery current change when the second bulb was added?"
+    - "Did changing a bulb's resistance change your answer to either question?"
+  scaffolding_level: medium
+
+analysis:
+  guiding_questions:
+    - "Using your runs as evidence, what happens to the current as it passes through bulb 1?"
+    - "Why might the battery current change when a second bulb is added?"
+    - "If the current is the same before and after the bulb, what does the bulb change instead?"
+  expected_patterns:
+    - "Students should notice that the ammeters before and after bulb 1 read the same in every run."
+    - "Students should notice that the battery current is lower with two bulbs than with one."
+    - "Students should link a larger total resistance to a smaller current."
+  scaffolding_level: medium
+
+discussion:
+  discussion_prompts:
+    - "Share your first prediction about the ammeter after bulb 1. Did your partner predict the same?"
+    - "Your friend in the opening story said the battery always pushes the same current. How would you answer them using your runs?"
+  peer_interaction_type: "pair-and-share, then whole-class"
+  scaffolding_level: medium
+
+reflection:
+  reflection_prompts:
+    - "Which of your predictions did the readings not support, and how has your idea changed?"
+    - "What is one question about circuits you have now that you did not have before?"
+  metacognitive_prompts:
+    - "What made you predict what you did before the first run?"
+    - "What evidence would convince a classmate who still thinks a bulb uses up current?"
+  scaffolding_level: low
+
+assessment:
+  rubric:
+    - criterion: "Uses ammeter readings as evidence about current in a series circuit."
+      levels:
+        - "Does not refer to the readings."
+        - "Refers to the readings but does not compare before and after."
+        - "Compares readings across runs and states what they show."
+    - criterion: "Explains how adding a bulb changes the battery current."
+      levels:
+        - "Cannot explain the change."
+        - "Describes the change without a reason."
+        - "Links the change to the total resistance of the circuit."
+  formative_checks:
+    - "Ask the student to commit a prediction BEFORE the first run."
+    - "Ask the student to compare their prediction with the readings in their own words."
+
+ai_tutor_config:
+  allowed_actions:
+    - hint
+    - rephrase_question
+    - encourage
+    - socratic_prompt
+    - summarize_student_reasoning
+  forbidden_actions:
+    - compute_science
+    - state_scientific_fact
+    - give_final_answer
+  fallback_when_asked_science: >
+    I'm not the source of the science — the engine in this lab is. Run the
+    experiment and tell me what the ammeters show. I can help you decide
+    what to try or how to read the result.
+
+prediction:
+  gate: true
+  input_mode: choice
+  items:
+    - id: pred_current_after_bulb1
+      experiment_ref: exp_series_current
+      question: "The ammeter before bulb 1 shows a current. What will the ammeter just after bulb 1 show?"
+      options:
+        - id: opt_after_less
+          label: "Less than before the bulb"
+          correct_when: "i_after_bulb1 < i_before_bulb1"
+          maps_to_misconception: m_current_used_up
+        - id: opt_after_same
+          label: "The same as before the bulb"
+          correct_when: "i_after_bulb1 == i_before_bulb1"
+          maps_to_misconception: null
+        - id: opt_after_more
+          label: "More than before the bulb"
+          correct_when: "i_after_bulb1 > i_before_bulb1"
+          maps_to_misconception: null
+
+    - id: pred_battery_current
+      experiment_ref: exp_add_bulb
+      question: "You add a second bulb in series with the first. What happens to the current from the battery?"
+      options:
+        - id: opt_battery_same
+          label: "It stays the same"
+          correct_when: "i_series == i_single"
+          maps_to_misconception: m_battery_constant_current
+        - id: opt_battery_lower
+          label: "It becomes lower"
+          correct_when: "i_series < i_single"
+          maps_to_misconception: null
+        - id: opt_battery_higher
+          label: "It becomes higher"
+          correct_when: "i_series > i_single"
+          maps_to_misconception: null
+
+misconceptions:
+  - id: m_current_used_up
+    statement: "Current is used up as it passes through a bulb."
+    source: "Verify: McDermott & Shaffer (1992); Shipstone (1984)"
+    detected_when: { prediction_option: opt_after_less }
+    discrepant_event: { experiment_ref: exp_series_current }
+    revision:
+      explain_prompt: "Look at the two ammeter readings from your run. In your own words, what do they show?"
+      compare_prompt: "Put your prediction next to the readings. Where do they agree, and where do they differ?"
+      revise_prompt: "Rewrite your idea about what happens to current in a bulb so that it fits every reading you have collected."
+      alternative_model: >
+        In a series circuit the same current flows through every part of
+        the loop. A bulb does not use up current; it transfers energy from
+        the moving charges into light and heat. That is why the ammeters
+        before and after the bulb read the same.
+
+  - id: m_battery_constant_current
+    statement: "A battery always supplies the same current, whatever is connected to it."
+    source: "Verify: Cohen, Eylon & Ganiel (1983); Shipstone (1984)"
+    detected_when: { prediction_option: opt_battery_same }
+    discrepant_event: { experiment_ref: exp_add_bulb }
+    revision:
+      explain_prompt: "Look at the battery current with one bulb and with two bulbs. In your own words, what changed?"
+      compare_prompt: "Put your prediction next to the two readings. Where do they agree, and where do they differ?"
+      revise_prompt: "Rewrite your idea about what a battery supplies so that it fits both readings."
+      alternative_model: >
+        A battery provides a fixed potential difference, not a fixed
+        current. Adding a second bulb in series increases the total
+        resistance, so less current flows from the battery.
+
+choice_points:
+  - id: cp_which_to_test
+    prompt: "What do you want to test first?"
+    options:
+      - id: cp_current_after_bulb
+        label: "The current before and after a bulb"
+        routes_to_misconception: m_current_used_up
+      - id: cp_add_second_bulb
+        label: "Adding a second bulb"
+        routes_to_misconception: m_battery_constant_current

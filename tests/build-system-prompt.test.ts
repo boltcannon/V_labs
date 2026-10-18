@@ -7,7 +7,7 @@ import {
 import type { ChatWithTutorInput } from "../src/app/lib/tutor-types";
 import type { InvestigationSummary } from "../src/app/lib/experiment-run";
 import type { PhaseId } from "../src/app/lib/session-shared";
-import { loadSpec, CLASS_6_PATH, CLASS_9_PATH } from "./helpers";
+import { loadSpec, CLASS_6_PATH, CLASS_9_PATH, CLASS_10_PATH } from "./helpers";
 
 /**
  * These tests are the architectural enforcement of Principle 8. If they
@@ -31,6 +31,7 @@ function baseInput(phase: PhaseId): ChatWithTutorInput {
 const SPECS = [
   { name: "class-9", path: CLASS_9_PATH },
   { name: "class-6", path: CLASS_6_PATH },
+  { name: "class-10", path: CLASS_10_PATH },
 ];
 
 /* ------------------------------------------------------------------ */
