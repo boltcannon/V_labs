@@ -130,28 +130,6 @@ function phaseContextBlock(spec: ValidatedLabSpec, phase: PhaseId): string {
         "Ask the student about their process, not the correctness of their conclusions.",
       ].join("\n\n");
 
-    case "review_testing":
-      // Include criterion names only, NOT levels — level strings contain
-      // judgment language the tutor could parrot as truth.
-      return [
-        "PHASE: Review & Testing.",
-        "Rubric criteria the student sees:\n" +
-          joinList(spec.assessment.rubric.map((r) => r.criterion)),
-        "Formative check prompts:\n" + joinList(spec.assessment.formative_checks),
-        "Help the student decide which criterion they want to strengthen. Do not score them.",
-      ].join("\n\n");
-
-    case "project_planning":
-      return [
-        "PHASE: Project Planning.",
-        "This phase is not yet built out in the framework. Keep responses short. Ask the student what they think the phase should focus on if they raise it.",
-      ].join("\n\n");
-
-    case "presentation_review":
-      return [
-        "PHASE: Presentation & Review.",
-        "This phase is not yet built out in the framework. Keep responses short.",
-      ].join("\n\n");
   }
 }
 

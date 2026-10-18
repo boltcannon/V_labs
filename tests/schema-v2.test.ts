@@ -329,7 +329,7 @@ describe("schema v2 — answers do not reach the client or the tutor", () => {
   it("the tutor system prompt contains no correct_when or alternative_model, on any phase", () => {
     const phases: PhaseId[] = [
       "provocation", "ncl", "investigation", "analysis", "discussion",
-      "project_planning", "presentation_review", "reflection", "review_testing",
+      "reflection",
     ];
     for (const phase of phases) {
       const prompt = buildSystemPrompt(spec, {

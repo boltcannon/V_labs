@@ -1,10 +1,9 @@
 "use client";
 
 /**
- * Persistent left rail. Shows all 9 phases, their status, and (for
+ * Persistent left rail. Shows all 6 phases, their status, and (for
  * completed phases) the student's response word count. Also renders the
- * overall progress bar — denominator is SUBMITTABLE_PHASES.length (6), not 9,
- * so a Prompt 2 student can reach 100%.
+ * overall progress bar.
  *
  * Investigation gets a visually distinct state: not "locked" (so the user
  * can visit and see the placeholder), but a muted "simulation coming soon"
@@ -19,10 +18,7 @@ import {
   BookOpenText,
   BarChart3,
   MessagesSquare,
-  ClipboardList,
-  Presentation,
   Compass,
-  ClipboardCheck,
   Lock,
   CircleDot,
   CheckCircle2,
@@ -49,10 +45,7 @@ const ICONS: Record<PhaseId, LucideIcon> = {
   investigation: Beaker,
   analysis: BarChart3,
   discussion: MessagesSquare,
-  project_planning: ClipboardList,
-  presentation_review: Presentation,
   reflection: Compass,
-  review_testing: ClipboardCheck,
 };
 
 interface Props {
