@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PHASE_LABELS, type PhaseId } from "@/app/lib/session-shared";
+import { PHASE_LABELS, PHASE_ORDER, type PhaseId } from "@/app/lib/session-shared";
 
 interface Props {
   phaseId: PhaseId;
@@ -17,17 +17,13 @@ const SCAFFOLD_COPY: Record<"high" | "medium" | "low" | "none", string> = {
   none: "No support",
 };
 
-/**
- * Wrapper around a phase's content. Presentational, so it can render in a
- * server component (its child slots are what carry any client-ness).
- */
 export function PhaseCard({ phaseId, phaseIndex, scaffolding, subtitle, children }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-baseline justify-between gap-4">
         <div>
           <div className="text-xs uppercase tracking-wider text-text-soft">
-            Phase {phaseIndex + 1} of 9
+            Phase {phaseIndex + 1} of {PHASE_ORDER.length}
           </div>
           <h1 className="text-2xl font-semibold text-text mt-1">
             {PHASE_LABELS[phaseId]}

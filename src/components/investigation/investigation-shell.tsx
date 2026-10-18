@@ -365,7 +365,7 @@ export function InvestigationShell({ labId, investigation, variables, prediction
       <div
         role="tablist"
         aria-label="Experiments"
-        className="flex flex-wrap items-center gap-1.5 border-b border-surface-border pb-2"
+        className="flex flex-wrap items-center gap-2 border-b border-surface-border pb-3"
       >
         {tabs.map((t) => {
           const isFree = t.id === FREE_EXPLORATION_ID;
